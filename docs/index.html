@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>بصيرة — مساعد بصري للمكفوفين</title>
+  <meta name="description" content="بصيرة تطبيق أندرويد يصف ما أمامك بصوت عربي باستخدام كاميرا نظارة Ray-Ban Meta. نسخة تجريبية.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'%3E%3Crect width='108' height='108' rx='24' fill='%23000'/%3E%3Cpath d='M24,54 C34,36 74,36 84,54 C74,72 34,72 24,54 Z' fill='none' stroke='%23FFD600' stroke-width='6'/%3E%3Ccircle cx='54' cy='54' r='10' fill='%23FFD600'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Colors match the app's high-contrast dark theme (app/.../presentation/theme). */
+    :root {
+      --primary: #FFD600;
+      --on-primary: #000000;
+      --primary-container: #332B00;
+      --on-primary-container: #FFF3B0;
+      --background: #000000;
+      --on-background: #FFFFFF;
+      --surface: #121212;
+      --surface-variant: #1E1E1E;
+      --on-surface-variant: #EDEDED;
+      --tertiary: #8FD8FF;
+      --error: #FF8A80;
+      --outline: #FFFFFF;
+      --radius: 20px;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--on-background);
+      font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+      font-size: 1.125rem;
+      line-height: 1.8;
+    }
+
+    a { color: var(--primary); }
+
+    :focus-visible {
+      outline: 4px solid var(--primary);
+      outline-offset: 4px;
+      border-radius: 6px;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 16px;
+      top: -100px;
+      background: var(--primary);
+      color: var(--on-primary);
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      z-index: 10;
+    }
+    .skip-link:focus { top: 16px; }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    /* Hero */
+    header {
+      padding: 56px 0 40px;
+      border-bottom: 1px solid #2A2A2A;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 40px;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .brand svg { width: 72px; height: 72px; flex: none; }
+    h1 {
+      margin: 0;
+      font-size: clamp(2.5rem, 7vw, 3.5rem);
+      line-height: 1.2;
+      color: var(--primary);
+    }
+    .tagline {
+      margin: 0 0 16px;
+      font-size: clamp(1.25rem, 3.5vw, 1.5rem);
+      font-weight: 600;
+    }
+    .lead { margin: 0; color: var(--on-surface-variant); max-width: 34em; }
+    .badge {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 6px 16px;
+      border: 2px solid var(--primary);
+      border-radius: 999px;
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    /* Phone mockup of the main screen */
+    .phone {
+      width: 260px;
+      border: 3px solid #3A3A3A;
+      border-radius: 36px;
+      padding: 14px;
+      background: var(--background);
+      box-shadow: 0 0 0 8px #111;
+    }
+    .phone-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface-variant);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--primary);
+      flex: none;
+    }
+    .phone-main {
+      margin: 14px 0;
+      height: 160px;
+      border-radius: 24px;
+      background: var(--primary);
+      color: var(--on-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+    .phone-main svg { width: 44px; height: 44px; }
+    .phone-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .phone-chip {
+      border: 2px solid var(--outline);
+      border-radius: 14px;
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .phone-last {
+      margin-top: 14px;
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+    .phone-last strong { display: block; color: var(--primary); font-size: 0.8rem; }
+
+    /* Sections */
+    main section { padding: 48px 0 8px; }
+    h2 {
+      margin: 0 0 24px;
+      font-size: clamp(1.6rem, 4.5vw, 2rem);
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h2::before {
+      content: "";
+      width: 8px;
+      height: 1.1em;
+      border-radius: 4px;
+      background: var(--primary);
+      flex: none;
+    }
+    h3 { margin: 0 0 6px; font-size: 1.2rem; color: var(--primary); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid #2A2A2A;
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+    .card p { margin: 0; color: var(--on-surface-variant); }
+    .card .icon {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      background: var(--primary-container);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      margin-bottom: 14px;
+    }
+    .card .icon svg { width: 26px; height: 26px; }
+
+    ol.steps {
+      list-style: none;
+      counter-reset: step;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 14px;
+    }
+    ol.steps > li {
+      counter-increment: step;
+      position: relative;
+      background: var(--surface);
+      border: 1px solid #2A2A2A;
+      border-radius: var(--radius);
+      padding: 20px 76px 20px 22px;
+      min-height: 76px;
+    }
+    ol.steps > li::before {
+      content: counter(step);
+      position: absolute;
+      inset-inline-start: 20px;
+      top: 18px;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: var(--on-primary);
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+    }
+
+    .btn-name {
+      display: inline-block;
+      background: var(--primary);
+      color: var(--on-primary);
+      border-radius: 10px;
+      padding: 0 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .say {
+      display: inline-block;
+      border: 2px solid var(--tertiary);
+      color: var(--tertiary);
+      border-radius: 999px;
+      padding: 0 12px;
+      margin: 4px 0;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    ul.plain { margin: 0; padding-inline-start: 1.2em; }
+    ul.plain li { margin-bottom: 10px; }
+    ul.plain li::marker { color: var(--primary); }
+
+    .warning {
+      background: #2A0F0D;
+      border: 2px solid var(--error);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+    }
+    .warning h2 { color: var(--error); margin-bottom: 12px; }
+    .warning h2::before { background: var(--error); }
+    .warning p { margin: 0 0 10px; }
+    .warning p:last-child { margin: 0; }
+
+    .note {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+    }
+    .note p { margin: 0; }
+
+    footer {
+      margin-top: 56px;
+      padding: 32px 0 48px;
+      border-top: 1px solid #2A2A2A;
+      color: var(--on-surface-variant);
+      font-size: 1rem;
+    }
+    footer p { margin: 0 0 6px; }
+
+    @media (max-width: 720px) {
+      header { padding-top: 32px; }
+      .hero { grid-template-columns: 1fr; }
+      .phone { margin: 0 auto; }
+      ol.steps > li { padding-inline-start: 72px; }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .phone-main { animation: pulse 2.4s ease-in-out infinite; }
+      @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 0, 0.45); }
+        50% { box-shadow: 0 0 0 10px rgba(255, 214, 0, 0); }
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">انتقل إلى المحتوى</a>
+
+  <header>
+    <div class="wrap hero">
+      <div>
+        <div class="brand">
+          <svg viewBox="0 0 108 108" aria-hidden="true">
+            <rect width="108" height="108" rx="24" fill="#000" stroke="#3A3A3A" stroke-width="2"/>
+            <path d="M24,54 C34,36 74,36 84,54 C74,72 34,72 24,54 Z" fill="none" stroke="#FFD600" stroke-width="6"/>
+            <circle cx="54" cy="54" r="10" fill="#FFD600"/>
+          </svg>
+          <h1>بصيرة</h1>
+        </div>
+        <p class="tagline">عيناك الإضافيتان عبر نظارة Ray-Ban Meta</p>
+        <p class="lead">
+          تطبيق أندرويد يلتقط صورة لما أمامك بكاميرا النظارة، ثم يصفها لك بصوت عربي واضح.
+          صُمّم للمكفوفين وضعاف البصر، ويعمل بالكامل مع قارئ الشاشة TalkBack.
+        </p>
+        <span class="badge">نسخة تجريبية</span>
+      </div>
+
+      <div class="phone" aria-hidden="true">
+        <div class="phone-status"><span class="dot"></span>النظارة جاهزة</div>
+        <div class="phone-main">
+          <svg viewBox="0 0 108 108">
+            <path d="M14,54 C28,30 80,30 94,54 C80,78 28,78 14,54 Z" fill="none" stroke="#000" stroke-width="8"/>
+            <circle cx="54" cy="54" r="13" fill="#000"/>
+          </svg>
+          صِف ما أمامي
+        </div>
+        <div class="phone-row">
+          <div class="phone-chip">اقرأ النص</div>
+          <div class="phone-chip">تعرّف على العملة</div>
+          <div class="phone-chip">ابحث</div>
+          <div class="phone-chip">أمر صوتي</div>
+        </div>
+        <div class="phone-last">
+          <strong>آخر وصف</strong>
+          درج أمامك على بعد خطوتين تقريباً، وعلى يمينه باب خشبي مفتوح.
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="content" class="wrap">
+    <section aria-labelledby="features">
+      <h2 id="features">ماذا يفعل التطبيق؟</h2>
+      <ul class="grid">
+        <li class="card">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>يصف ما أمامك</h3>
+          <p>يذكر العوائق والأشياء المهمة أولاً، ثم بقية المشهد. الوصف مختصر، ويمكنك اختيار الوصف المفصّل.</p>
+        </li>
+        <li class="card">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          </div>
+          <h3>يقرأ النصوص</h3>
+          <p>يقرأ لك المكتوب أمامك، مثل اللافتات والأوراق وعلب المنتجات.</p>
+        </li>
+        <li class="card">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>
+          </div>
+          <h3>يبحث عن الأشياء</h3>
+          <p>قل له اسم ما تبحث عنه، مثل المفاتيح أو الكوب، فيخبرك إن كان أمامك وأين.</p>
+        </li>
+        <li class="card">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>يتعرّف على العملة</h3>
+          <p>يذكر فئة الورقة النقدية، لكنه لا يقولها إلا إذا كان متأكداً منها.</p>
+        </li>
+        <li class="card">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          </div>
+          <h3>يعيد ويوقف الكلام</h3>
+          <p>يعيد آخر وصف متى طلبت، ويوقف الكلام فوراً.</p>
+        </li>
+        <li class="card">
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          </div>
+          <h3>أين هاتفي؟</h3>
+          <p>زر يشغّل صوتاً في الهاتف لتعثر عليه بسهولة.</p>
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="setup">
+      <h2 id="setup">التجهيز لأول مرة</h2>
+      <ol class="steps">
+        <li>ثبّت تطبيق <strong>Meta AI</strong> واقرن النظارة معه، ثم فعّل <strong>وضع المطوّر</strong> للنظارة من داخله.</li>
+        <li>ثبّت ملف بصيرة. إذا ظهر تحذير فاسمح بالتثبيت من مصدر غير معروف.</li>
+        <li>
+          افتح بصيرة واتبع خطوات الإعداد: اضغط <span class="btn-name">اسمح بالأجهزة القريبة</span>،
+          ثم <span class="btn-name">اربط مع Meta AI</span> ووافق داخل تطبيق Meta AI وعُد إلى بصيرة،
+          ثم <span class="btn-name">اسمح بالكاميرا</span> ووافق.
+        </li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="usage">
+      <h2 id="usage">طريقة الاستخدام</h2>
+      <ol class="steps">
+        <li>البس النظارة واجعل وجهك باتجاه ما تريد معرفته.</li>
+        <li>اضغط الزر الكبير <span class="btn-name">صِف ما أمامي</span> وانتظر ثانيتين أو ثلاثاً حتى تسمع الوصف.</li>
+        <li>بقية الأزرار في قسم «خيارات أخرى»: <span class="btn-name">اقرأ النص</span> و<span class="btn-name">تعرّف على العملة</span> و<span class="btn-name">ابحث</span>.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="voice">
+      <h2 id="voice">الأوامر الصوتية</h2>
+      <div class="card">
+        <p>اضغط <span class="btn-name">أمر صوتي</span> ثم تكلّم. أمثلة على ما يمكنك قوله:</p>
+        <p>
+          <span class="say">شو قدامي</span>
+          <span class="say">اقرأ</span>
+          <span class="say">ابحث عن المفتاح</span>
+          <span class="say">كم هالمصاري</span>
+          <span class="say">كرر</span>
+          <span class="say">اسكت</span>
+        </p>
+      </div>
+    </section>
+
+    <section aria-labelledby="more">
+      <h2 id="more">طرق أخرى للتحكم</h2>
+      <ul class="plain">
+        <li>تجد في <strong>الإشعار</strong> أزرار: صِف، وأعد، وأوقف الكلام، وأنهِ الجلسة.</li>
+        <li>من <strong>الإعدادات</strong> تستطيع تغيير سرعة الكلام واللغة (العربية أو الإنجليزية)، وتفعيل الأوصاف المفصّلة.</li>
+        <li>لا يحفظ التطبيق الصور، ولا يتعرّف على الوجوه.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="safety">
+      <div class="warning">
+        <h2 id="safety">تنبيه مهم</h2>
+        <p>التطبيق يحتاج إلى إنترنت، وقد يخطئ أحياناً.</p>
+        <p>لا تعتمد عليه وحده في عبور الطريق أو في معرفة الأدوية أو في الحالات الطارئة، وأبقِ العصا معك دائماً.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="feedback">
+      <div class="note">
+        <h2 id="feedback">رأيك يهمنا</h2>
+        <p>أخبرنا بكل شيء: ما الذي نجح، وما الذي لم ينجح، وهل كان الوصف واضحاً وسريعاً. شكراً لك.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>بصيرة — نسخة تجريبية 0.1.0 لأندرويد 10 فما فوق.</p>
+      <p>يتطلب نظارة Ray-Ban Meta وتطبيق Meta AI.</p>
+    </div>
+  </footer>
+</body>
+</html>
