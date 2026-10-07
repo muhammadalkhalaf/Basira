@@ -4,7 +4,8 @@ Basira is a native Android app that helps blind and low-vision Arabic speakers u
 surroundings with Ray-Ban Meta glasses. On request it captures one still photo from the glasses camera
 through the Meta Wearables Device Access Toolkit (DAT), sends it **directly from the phone to Google's
 Gemini API**, and speaks a short Arabic description with Android Text-to-Speech, preferably through
-the glasses speakers. No application backend is used.
+the glasses speakers. No application backend is used. Release builds report crashes and basic usage
+to Firebase (Crashlytics and Analytics); images and descriptions are never sent there.
 
 > **Experimental, private build only.** The Gemini API key is compiled into the APK and can be
 > extracted by anyone who has the APK. This design is unsuitable for public or production
@@ -25,6 +26,7 @@ medicine, or emergency decisions.
 | Bundled-sample simulation ("fake" glasses) | Implemented and covered by JVM tests |
 | Direct Gemini client (Interactions API), retries, errors | Tested against MockWebServer, and **verified against the real Gemini API from the phone** (`GeminiLiveInstrumentedTest` and the full UI flow: Arabic description spoken, key absent from logcat). See "Model latency" below |
 | TTS, audio routing, audio focus | Implemented; route-loss behavior unit-tested through fakes; **not verified on hardware** |
+| Firebase (Analytics + Crashlytics) | **Verified on the phone (2026-10-07)**: `first_open`/`session_start`/`screen_view` uploaded (HTTP 204), shell-induced test crash uploaded (HTTP 200), ad consent denied; debug build reports nothing by default |
 
 ## Capabilities
 
@@ -199,12 +201,32 @@ Images are re-encoded JPEG (longest edge 1280 px, quality 82 then lower if neede
 without EXIF metadata. Debug builds log only BASIC HTTP lines with `x-goog-api-key` redacted; release
 builds have no network logging. Certificate pinning is not enabled (no rotation plan).
 
+## Firebase (Analytics + Crashlytics)
+
+Firebase project `basira-75f4b`, Android app `com.basira.app`.
+
+- Copy `google-services.json` from the Firebase console to `app/google-services.json`. It is
+  untracked (listed in `.gitignore`). Without it the Google Services and Crashlytics Gradle plugins
+  are not applied, the app still builds, and Firebase stays inactive.
+- Collection is **on in release and off in debug**, so development sessions do not pollute tester
+  data. To test Firebase from a debug build:
+  `./gradlew :app:installDebug -Pbasira.firebase.debugCollection=true`.
+- Only the SDKs' automatic data is collected (Analytics: `first_open`, `session_start`,
+  `screen_view`, app/OS version; Crashlytics: crash stack traces and device state). The app logs no
+  custom events, keys, or messages. Never pass images, prompts, recognized text, descriptions, object
+  names, or the API key to Firebase.
+- Privacy: the advertising ID, SSAID, and Privacy Sandbox (AdServices) permissions are disabled or
+  removed, and ad-related consent signals default to denied.
+- `assembleRelease` uploads the R8 mapping file to Crashlytics (`uploadCrashlyticsMappingFileRelease`)
+  so stack traces are deobfuscated; skip it with `-x uploadCrashlyticsMappingFileRelease`.
+
 ## Build modes
 
 | Property | Values | Default (debug) | Release |
 |---|---|---|---|
 | `basira.glasses` | `fake`, `mockdevicekit`, `real` | `fake` | always `real` |
 | `basira.vision` | `fake`, `remote` (Gemini directly) | `fake` unless `GEMINI_API_KEY` is set | always `remote` |
+| `basira.firebase.debugCollection` | `true`, `false` | `false` | always on |
 
 - `fake` glasses: bundled sample images (text sign, stairs, indoor room, empty dark frame); no
   glasses, no Meta AI, no DAT.
@@ -296,7 +318,8 @@ See [docs/MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) for TalkBack and hardwa
 See [SECURITY.md](SECURITY.md). In short: the API key is extractable from the APK (accepted for this
 private test build only); images go directly from the phone to Google's Gemini API and are not
 intentionally stored by the app; no image storage by default (explicit opt-in), optional text history
-off by default, delete-local-data action, no analytics, redacted logs, no backup of app data.
+off by default, delete-local-data action, Firebase Analytics/Crashlytics in release only (no images or
+descriptions, no advertising ID), redacted logs, no backup of app data.
 
 ## Safety
 

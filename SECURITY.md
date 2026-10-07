@@ -43,7 +43,8 @@ The project owner explicitly accepted these risks for private testing.
 ## Data handling
 
 - Photos are sent **directly from the phone to Google's Gemini API** and processed under the
-  [Gemini API terms](https://ai.google.dev/gemini-api/terms). No other server receives them.
+  [Gemini API terms](https://ai.google.dev/gemini-api/terms). No other server receives them
+  (Firebase never receives images or descriptions).
 - The app does not intentionally store photos: they are processed in memory, re-encoded as JPEG
   without EXIF (removes GPS location, timestamps, device data), sent, and discarded. No temporary file
   is written for the upload.
@@ -52,7 +53,19 @@ The project owner explicitly accepted these risks for private testing.
 - Description history (text only) is off by default; turning it off deletes it. "Delete history and
   saved photos" removes both.
 - `allowBackup=false` and data-extraction rules exclude all app data from cloud backup and transfer.
-- No analytics. DAT analytics and DAT crash reporting are opted out in the manifest.
+- DAT analytics and DAT crash reporting are opted out in the manifest.
+- **Firebase Analytics and Crashlytics** (project `basira-75f4b`) are active in release builds only
+  (off in debug unless `-Pbasira.firebase.debugCollection=true`). They collect only the SDKs'
+  automatic data: app-usage events such as `first_open`, `session_start`, and `screen_view`, the
+  Firebase installation ID, app/OS/device model and coarse region, and crash stack traces. The app
+  sends no custom events, keys, or log messages: never pass images, prompts, recognized text,
+  descriptions, object names, or the API key to Firebase.
+- Advertising ID and SSAID collection are disabled, the `AD_ID` and Privacy Sandbox (AdServices)
+  permissions are removed, and ad storage/user-data/personalization consent defaults to denied.
+- `google-services.json` is untracked. Its API key identifies the Firebase project and is not a
+  secret, but restrict it in Google Cloud Console (Android app restriction for `com.basira.app` and
+  the release signing certificate) and keep it separate from the Gemini key.
+- Testers must be told that release builds send crash reports and usage statistics to Firebase.
 
 ## Safety
 

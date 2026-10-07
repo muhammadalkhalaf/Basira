@@ -19,6 +19,10 @@ okhttp = "5.5.0"
 javaxInject = "1"
 # Meta Wearables Device Access Toolkit (developer preview). Verified against Maven Central metadata.
 mwdat = "1.0.0"
+# Firebase (Analytics + Crashlytics). Versions verified against Google Maven metadata.
+firebaseBom = "34.19.0"
+googleServices = "4.5.0"
+crashlyticsPlugin = "3.0.8"
 junit = "4.13.2"
 turbine = "1.2.1"
 robolectric = "4.17"
@@ -68,6 +72,10 @@ mwdat-core = { module = "com.meta.wearable:mwdat-core", version.ref = "mwdat" }
 mwdat-camera = { module = "com.meta.wearable:mwdat-camera", version.ref = "mwdat" }
 mwdat-mockdevice = { module = "com.meta.wearable:mwdat-mockdevice", version.ref = "mwdat" }
 
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+
 junit = { module = "junit:junit", version.ref = "junit" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
@@ -82,3 +90,5 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }

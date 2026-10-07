@@ -9,6 +9,17 @@ plugins {
 }
 
 /**
+ * Firebase (Analytics + Crashlytics). google-services.json is untracked (see .gitignore) and belongs in
+ * app/. Without it the Google Services and Crashlytics plugins are not applied: the app still builds,
+ * Firebase stays uninitialized at runtime, and nothing is collected.
+ */
+val firebaseConfigured = file("google-services.json").exists()
+if (firebaseConfigured) {
+    pluginManager.apply(libs.plugins.google.services.get().pluginId)
+    pluginManager.apply(libs.plugins.firebase.crashlytics.get().pluginId)
+}
+
+/**
  * Build-time configuration, read from Gradle properties (-P or gradle.properties) first and from the
  * untracked local.properties second.
  *
@@ -28,6 +39,10 @@ fun config(name: String, default: String): String =
 val debugGlassesMode = config("basira.glasses", "fake")
 val geminiApiKey = config("GEMINI_API_KEY", "").trim()
 val geminiModel = config("GEMINI_MODEL", "gemini-3.5-flash-lite").trim().ifEmpty { "gemini-3.5-flash-lite" }
+
+// Firebase collection (Analytics + Crashlytics) is always on in release and off in debug unless
+// basira.firebase.debugCollection=true, so development sessions do not pollute tester data.
+val debugFirebaseCollection = config("basira.firebase.debugCollection", "false").toBoolean()
 
 // "fake" = canned Arabic descriptions (never calls Gemini), "remote" = Gemini API directly.
 val debugVisionMode = config("basira.vision", if (geminiApiKey.isBlank()) "fake" else "remote")
@@ -82,6 +97,7 @@ android {
         debug {
             buildConfigField("String", "GLASSES_MODE", "\"$debugGlassesMode\"")
             buildConfigField("String", "VISION_MODE", "\"$debugVisionMode\"")
+            manifestPlaceholders["firebaseCollectionEnabled"] = debugFirebaseCollection.toString()
         }
         release {
             isMinifyEnabled = true
@@ -89,6 +105,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "GLASSES_MODE", "\"real\"")
             buildConfigField("String", "VISION_MODE", "\"remote\"")
+            manifestPlaceholders["firebaseCollectionEnabled"] = "true"
         }
     }
 
@@ -129,6 +146,7 @@ android {
 tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     doFirst {
         if (geminiApiKey.isBlank()) logger.warn("GEMINI_API_KEY is not set: this release cannot describe images.")
+        if (!firebaseConfigured) logger.warn("app/google-services.json is missing: this release has no Analytics or Crashlytics.")
     }
 }
 
@@ -170,6 +188,10 @@ dependencies {
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
     debugImplementation(libs.mwdat.mockdevice)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

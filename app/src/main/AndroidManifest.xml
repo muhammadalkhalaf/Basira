@@ -19,6 +19,16 @@
     <!-- Satisfies the connectedDevice foreground-service prerequisite on Android 14+ even when
          BLUETOOTH_CONNECT is not yet granted. -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Privacy: Firebase Analytics must not read the advertising ID or use Privacy Sandbox ad APIs. -->
+    <uses-permission
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
 
     <queries>
         <!-- Meta AI companion app (also declared by DAT) -->
@@ -57,6 +67,30 @@
         <meta-data
             android:name="com.meta.wearable.mwdat.CRASH_REPORTING_OPT_OUT"
             android:value="true" />
+
+        <!-- Firebase: collection is on in release and off in debug (see app/build.gradle.kts). -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="${firebaseCollectionEnabled}" />
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="${firebaseCollectionEnabled}" />
+        <!-- Privacy: no advertising ID, no SSAID, and ad-related consent denied by default. -->
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_ssaid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_default_allow_ad_storage"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_default_allow_ad_user_data"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false" />
 
         <activity
             android:name=".MainActivity"
