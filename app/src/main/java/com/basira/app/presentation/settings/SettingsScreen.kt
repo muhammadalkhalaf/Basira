@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -29,11 +30,16 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.intl.LocaleList
 import com.basira.app.R
+import com.basira.app.presentation.components.LabeledRadioButton
 import com.basira.app.presentation.components.LabeledSwitch
 import com.basira.app.presentation.components.SecondaryActionButton
 import com.basira.app.presentation.components.SectionHeading
 import com.basira.app.presentation.theme.Dimens
+import com.basira.domain.model.LanguagePreference
 import com.basira.domain.model.Verbosity
 import kotlin.math.roundToInt
 
@@ -41,6 +47,7 @@ import kotlin.math.roundToInt
  * Callbacks of [SettingsScreen].
  *
  * @property onBack navigate back.
+ * @property onLanguage change the app language.
  * @property onDetailed toggle detailed descriptions.
  * @property onSpeechRate change speech rate.
  * @property onSaveHistory toggle history.
@@ -55,6 +62,7 @@ import kotlin.math.roundToInt
  */
 data class SettingsCallbacks(
     val onBack: () -> Unit,
+    val onLanguage: (LanguagePreference) -> Unit,
     val onDetailed: (Boolean) -> Unit,
     val onSpeechRate: (Float) -> Unit,
     val onSaveHistory: (Boolean) -> Unit,
@@ -94,6 +102,8 @@ fun SettingsScreen(state: SettingsUiState, callbacks: SettingsCallbacks) {
                     modifier = Modifier.semantics { heading() },
                 )
             }
+
+            Language(state.language, callbacks.onLanguage)
 
             SectionHeading(stringResource(R.string.settings_descriptions_heading))
             LabeledSwitch(
@@ -170,6 +180,28 @@ fun SettingsScreen(state: SettingsUiState, callbacks: SettingsCallbacks) {
         }
     }
     Dialogs(state, callbacks)
+}
+
+@Composable
+private fun Language(selected: LanguagePreference, onSelect: (LanguagePreference) -> Unit) {
+    SectionHeading(stringResource(R.string.settings_language_heading))
+    Text(stringResource(R.string.settings_language_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground)
+    Column(Modifier.fillMaxWidth().selectableGroup()) {
+        LanguagePreference.entries.forEach { option ->
+            val name = stringResource(
+                when (option) {
+                    LanguagePreference.SYSTEM -> R.string.settings_language_system
+                    LanguagePreference.ARABIC -> R.string.settings_language_arabic
+                    LanguagePreference.ENGLISH -> R.string.settings_language_english
+                },
+            )
+            // Each language is named in itself; the locale span lets TalkBack pronounce it correctly.
+            val label = option.language
+                ?.let { AnnotatedString(name, SpanStyle(localeList = LocaleList(it.tag))) }
+                ?: AnnotatedString(name)
+            LabeledRadioButton(label = label, selected = option == selected, onSelect = { onSelect(option) })
+        }
+    }
 }
 
 @Composable

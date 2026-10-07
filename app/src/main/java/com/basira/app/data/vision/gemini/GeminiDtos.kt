@@ -160,9 +160,9 @@ data class GeminiApiError(
 /**
  * The structured answer requested from the model (the text of the `model_output` step).
  *
- * @property description Arabic description for speech.
+ * @property description description for speech, in the requested language.
  * @property confidence HIGH, MEDIUM, or LOW.
- * @property warnings short Arabic warnings.
+ * @property warnings short warnings in the requested language.
  */
 @Serializable
 data class GeminiStructuredAnswer(

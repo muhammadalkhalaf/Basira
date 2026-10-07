@@ -4,6 +4,7 @@ import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.core.error.AppError
 import com.basira.core.error.UpdateTarget
 import com.basira.core.result.AppResult
+import com.basira.domain.fakes.FakeAppLanguageRepository
 import com.basira.domain.fakes.FakeConnectivityObserver
 import com.basira.domain.fakes.FakeGlassesRepositoryForTest
 import com.basira.domain.fakes.FakeHistoryRepository
@@ -92,6 +93,7 @@ class AssistantEngineTest {
             requestIds = { "req-${++requestCounter}" },
             clock = { 42L },
             validator = DescriptionValidator(),
+            appLanguage = FakeAppLanguageRepository(),
         )
         return AssistantEngine(
             glasses = glasses,
@@ -352,11 +354,11 @@ class AssistantEngineTest {
         speech.state.update { it.copy(availability = SpeechAvailability.ENGINE_UNAVAILABLE) }
         val engine = createEngine()
         advanceUntilIdle()
-        assertEquals(AssistantPhase.SpeechUnavailable(arabicVoiceMissing = false), engine.state.value.phase)
+        assertEquals(AssistantPhase.SpeechUnavailable(voiceMissing = false), engine.state.value.phase)
 
-        speech.state.update { it.copy(availability = SpeechAvailability.ARABIC_MISSING) }
+        speech.state.update { it.copy(availability = SpeechAvailability.VOICE_MISSING) }
         advanceUntilIdle()
-        assertEquals(AssistantPhase.SpeechUnavailable(arabicVoiceMissing = true), engine.state.value.phase)
+        assertEquals(AssistantPhase.SpeechUnavailable(voiceMissing = true), engine.state.value.phase)
 
         engine.analyze()
         advanceUntilIdle()

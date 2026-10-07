@@ -2,6 +2,7 @@ package com.basira.app
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -25,7 +26,9 @@ import com.basira.app.data.glasses.DatSdkInitializer
 import com.basira.app.data.glasses.GlassesSetupLauncher
 import com.basira.app.data.glasses.MetaAiAppDetector
 import com.basira.app.data.glasses.PendingRegistrationRequest
+import com.basira.app.localization.AppLocales
 import com.basira.app.localization.SetupAction
+import com.basira.app.localization.shownLanguage
 import com.basira.app.presentation.navigation.BasiraNavHost
 import com.basira.app.presentation.setup.ActivityEffect
 import com.basira.app.presentation.setup.ActivityEffectBus
@@ -37,6 +40,7 @@ import com.basira.core.reporting.ErrorReporter
 import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.assistant.AssistantAction
 import com.basira.domain.assistant.AssistantEngine
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.GlassesRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -66,11 +70,17 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var errorReporter: ErrorReporter
 
+    @Inject lateinit var appLanguage: AppLanguageRepository
+
     private lateinit var cameraPermissionLauncher: ActivityResultLauncher<Unit>
     private lateinit var bluetoothLauncher: ActivityResultLauncher<String>
     private lateinit var microphoneLauncher: ActivityResultLauncher<String>
     private lateinit var notificationLauncher: ActivityResultLauncher<String>
     private val pendingRegistration = mutableStateOf<PendingRegistrationRequest?>(null)
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocales.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +95,14 @@ class MainActivity : ComponentActivity() {
         handleDeepLink(intent)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) { effectBus.effects.collect(::execute) }
+        }
+        // Android 13+ recreates the activity itself when the per-app language changes.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    appLanguage.language.collect { if (it != shownLanguage) recreate() }
+                }
+            }
         }
     }
 
@@ -146,7 +164,7 @@ class MainActivity : ComponentActivity() {
             SetupAction.ALLOW_CAMERA -> cameraPermissionLauncher.launch(Unit)
             SetupAction.UPDATE_FIRMWARE -> if (!setupLauncher.openFirmwareUpdate(this)) metaAi.launchIntent()?.let(::startSafely)
             SetupAction.UPDATE_GLASSES_APP -> if (!setupLauncher.openGlassesAppUpdate(this)) metaAi.launchIntent()?.let(::startSafely)
-            SetupAction.INSTALL_ARABIC_VOICE ->
+            SetupAction.INSTALL_VOICE ->
                 startSafely(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)) || startSafely(Intent(TTS_SETTINGS_ACTION))
             SetupAction.OPEN_TTS_SETTINGS -> startSafely(Intent(TTS_SETTINGS_ACTION)) || openAppSettings()
         }

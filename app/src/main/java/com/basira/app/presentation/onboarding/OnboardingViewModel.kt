@@ -1,12 +1,12 @@
 package com.basira.app.presentation.onboarding
 
 import android.content.Context
-import android.content.res.Configuration
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.basira.app.R
 import com.basira.app.localization.SetupAction
+import com.basira.app.localization.withLanguage
 import com.basira.app.presentation.setup.ActivityEffect
 import com.basira.app.presentation.setup.ActivityEffectBus
 import com.basira.app.presentation.setup.PermissionStatusProvider
@@ -17,11 +17,11 @@ import com.basira.domain.model.LinkStatus
 import com.basira.domain.model.RegistrationStatus
 import com.basira.domain.model.SdkState
 import com.basira.domain.model.SpeechAvailability
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.SettingsRepository
 import com.basira.domain.repository.SpeechOutput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -63,7 +63,7 @@ data class SetupCheck(
  * @property step current zero-based step.
  * @property totalSteps number of steps.
  * @property checks setup checklist.
- * @property voiceCheck Arabic voice row.
+ * @property voiceCheck voice row for the app language.
  */
 data class OnboardingUiState(
     val step: Int = 0,
@@ -82,7 +82,7 @@ data class OnboardingUiState(
 
 /**
  * Guided first-run setup that can be completed with TalkBack: welcome, privacy and safety consent
- * (required), glasses and permission checklist, Arabic voice check, and completion.
+ * (required), glasses and permission checklist, voice check, and completion.
  */
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
@@ -91,6 +91,7 @@ class OnboardingViewModel @Inject constructor(
     private val effects: ActivityEffectBus,
     private val permissions: PermissionStatusProvider,
     private val speech: SpeechOutput,
+    private val appLanguage: AppLanguageRepository,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -141,12 +142,10 @@ class OnboardingViewModel @Inject constructor(
         permissionTick.value += 1
     }
 
-    /** Speaks an Arabic test sentence. */
+    /** Speaks a test sentence in the app language. */
     fun testVoice() {
-        val arabic = context.createConfigurationContext(
-            Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag("ar")) },
-        )
-        viewModelScope.launch { speech.speak(arabic.getString(R.string.voice_test_sentence)) }
+        val texts = context.withLanguage(appLanguage.language.value)
+        viewModelScope.launch { speech.speak(texts.getString(R.string.voice_test_sentence)) }
     }
 
     /**
@@ -197,7 +196,7 @@ class OnboardingViewModel @Inject constructor(
     private fun voiceCheckFor(@Suppress("UNUSED_PARAMETER") state: AssistantState): SetupCheck = when (speech.state.value.availability) {
         SpeechAvailability.READY -> SetupCheck(R.string.check_voice, CheckState.DONE)
         SpeechAvailability.INITIALIZING -> SetupCheck(R.string.check_voice, CheckState.CHECKING)
-        SpeechAvailability.ARABIC_MISSING -> SetupCheck(R.string.check_voice, CheckState.NEEDED, SetupAction.INSTALL_ARABIC_VOICE)
+        SpeechAvailability.VOICE_MISSING -> SetupCheck(R.string.check_voice, CheckState.NEEDED, SetupAction.INSTALL_VOICE)
         SpeechAvailability.ENGINE_UNAVAILABLE -> SetupCheck(R.string.check_voice, CheckState.NEEDED, SetupAction.OPEN_TTS_SETTINGS)
     }
 }

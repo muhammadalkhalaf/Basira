@@ -17,6 +17,7 @@ import com.basira.core.reporting.ErrorReport
 import com.basira.core.reporting.ErrorReporter
 import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.VoiceCommandRecognizer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -29,13 +30,15 @@ import kotlinx.coroutines.withContext
  *
  * It listens only after an explicit user action and stops after one utterance. The default input is
  * the phone microphone: the app never starts Bluetooth SCO, so the glasses' HFP microphone is not
- * opened and the DAT camera session is not disturbed.
+ * opened and the DAT camera session is not disturbed. Commands are recognized in the app language;
+ * the parser understands both Arabic and English phrasing.
  */
 class AndroidVoiceCommandRecognizer @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val dispatchers: DispatcherProvider,
     private val logger: AppLogger,
     private val errorReporter: ErrorReporter,
+    private val appLanguage: AppLanguageRepository,
 ) : VoiceCommandRecognizer {
 
     override suspend fun listenOnce(): AppResult<String> = withContext<AppResult<String>>(dispatchers.main) {
@@ -88,7 +91,7 @@ class AndroidVoiceCommandRecognizer @Inject constructor(
             recognizer.startListening(
                 Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, LANGUAGE)
+                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, appLanguage.language.value.tag)
                     .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
                     .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false),
             )
@@ -111,6 +114,5 @@ class AndroidVoiceCommandRecognizer @Inject constructor(
 
     private companion object {
         const val TAG = "Voice"
-        const val LANGUAGE = "ar"
     }
 }

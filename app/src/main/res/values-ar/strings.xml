@@ -28,8 +28,8 @@
     <string name="status_update_this_app_detail">هذا الإصدار لم يعد متوافقاً مع نظارتك. ثبّت أحدث إصدار من بصيرة.</string>
     <string name="status_tts_missing_title">لا يوجد محرك نطق</string>
     <string name="status_tts_missing_detail">ثبّت تطبيق تحويل النص إلى كلام يدعم العربية، مثل خدمات النطق من Google، ثم عد إلى هذا التطبيق.</string>
-    <string name="status_arabic_missing_title">الصوت العربي غير مثبت</string>
-    <string name="status_arabic_missing_detail">اضغط زر تثبيت الصوت العربي ونزّل بيانات الصوت العربي. لن يتكلم التطبيق بلغة أخرى بدلاً منه.</string>
+    <string name="status_voice_missing_title">الصوت العربي غير مثبت</string>
+    <string name="status_voice_missing_detail">اضغط زر تثبيت الصوت العربي ونزّل بيانات الصوت العربي. لن يتكلم التطبيق بلغة أخرى بدلاً منه.</string>
     <string name="status_offline_title">لا يوجد اتصال بالإنترنت</string>
     <string name="status_offline_detail">الوصف يحتاج إلى الإنترنت. اتصل بشبكة Wi-Fi أو ببيانات الجوال.</string>
     <string name="status_ready_title">جاهز</string>
@@ -146,7 +146,7 @@
     <string name="setup_allow_camera">اسمح بالكاميرا</string>
     <string name="setup_update_glasses">حدّث النظارة في Meta AI</string>
     <string name="setup_update_glasses_app">حدّث تطبيق النظارة</string>
-    <string name="setup_install_arabic_voice">ثبّت الصوت العربي</string>
+    <string name="setup_install_voice">ثبّت الصوت العربي</string>
     <string name="setup_open_tts_settings">افتح إعدادات النطق</string>
     <string name="setup_allow_notifications">اسمح بالإشعارات</string>
     <string name="setup_start_session">ابدأ جلسة النظارة</string>
@@ -169,7 +169,7 @@
     <string name="onboarding_next">التالي</string>
     <string name="onboarding_back">السابق</string>
     <string name="onboarding_welcome_title">مرحباً بك في بصيرة</string>
-    <string name="onboarding_welcome_body">تصف بصيرة ما حولك باستخدام كاميرا نظارة Ray-Ban Meta وتتكلم بالعربية. هذا الإعداد يعمل مع TalkBack ويستغرق بضع دقائق.</string>
+    <string name="onboarding_welcome_body">تصف بصيرة ما حولك باستخدام كاميرا نظارة Ray-Ban Meta وتتكلم بلغة التطبيق، العربية أو الإنجليزية، ويمكنك تغييرها من الإعدادات. هذا الإعداد يعمل مع TalkBack ويستغرق بضع دقائق.</string>
     <string name="onboarding_consent_title">الخصوصية والسلامة</string>
     <string name="consent_point_capture">تلتقط كاميرا النظارة ما حولك عندما تطلب وصفاً.</string>
     <string name="consent_point_people">قد تتضمن الصور أشخاصاً آخرين ومعلومات خاصة.</string>
@@ -203,6 +203,11 @@
 
     <string name="settings_title">الإعدادات</string>
     <string name="navigate_back">رجوع</string>
+    <string name="settings_language_heading">اللغة</string>
+    <string name="settings_language_summary">تعرض بصيرة شاشاتها وتتكلم وتصف بهذه اللغة.</string>
+    <string name="settings_language_system">لغة الهاتف</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_language_english">English</string>
     <string name="settings_descriptions_heading">الأوصاف</string>
     <string name="settings_speech_rate">سرعة الكلام</string>
     <string name="settings_speech_rate_value">%1$d%%</string>

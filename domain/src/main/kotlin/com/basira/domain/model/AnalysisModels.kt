@@ -64,7 +64,7 @@ class CapturedImage(
  * @property image upload-ready image.
  * @property mode requested assistance mode.
  * @property targetObject object name for [AnalysisMode.FIND_OBJECT]; `null` otherwise.
- * @property language BCP-47 language of the expected response; always Arabic for this product.
+ * @property language BCP-47 language of the expected response; the app language.
  * @property verbosity preferred response length.
  * @property requestId unique identifier used for correlation and idempotency on the server.
  */
@@ -81,7 +81,7 @@ data class VisionAnalysisRequest(
  * Validated description ready to be spoken.
  *
  * @property requestId identifier of the request that produced this description.
- * @property text Arabic text suitable for speech.
+ * @property text text in the app language, suitable for speech.
  * @property confidence provider-reported confidence.
  * @property warnings short safety or quality warnings reported by the vision provider.
  * @property processingTimeMillis server processing time, if reported.
@@ -111,7 +111,7 @@ sealed interface VisionAnalysisResult {
      * The vision provider returned a structurally valid response.
      *
      * @property requestId echo of the request identifier.
-     * @property description Arabic description; may be blank when nothing was recognized.
+     * @property description description in the requested language; may be blank when nothing was recognized.
      * @property confidence reported confidence.
      * @property warnings reported warnings.
      * @property processingTimeMillis reported processing time.

@@ -15,7 +15,7 @@ import kotlinx.serialization.json.Json
 /**
  * Validated answer extracted from a Gemini interaction.
  *
- * @property description Arabic description; may be empty (handled as "nothing recognized").
+ * @property description description in the requested language; may be empty (handled as "nothing recognized").
  * @property confidence HIGH, MEDIUM, or LOW; never [Confidence.UNKNOWN].
  * @property warnings short warnings.
  */

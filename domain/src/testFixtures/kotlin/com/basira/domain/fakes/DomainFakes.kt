@@ -6,6 +6,7 @@ import com.basira.core.reporting.ErrorReporter
 import com.basira.core.result.AppResult
 import com.basira.domain.assistant.Announcement
 import com.basira.domain.assistant.Announcer
+import com.basira.domain.model.AppLanguage
 import com.basira.domain.model.AudioRoute
 import com.basira.domain.model.CameraPermissionStatus
 import com.basira.domain.model.CapturedImage
@@ -14,6 +15,7 @@ import com.basira.domain.model.ConnectivityStatus
 import com.basira.domain.model.FeedbackCue
 import com.basira.domain.model.GlassesDevice
 import com.basira.domain.model.GlassesStatus
+import com.basira.domain.model.LanguagePreference
 import com.basira.domain.model.LinkStatus
 import com.basira.domain.model.RegistrationStatus
 import com.basira.domain.model.SceneDescription
@@ -27,6 +29,7 @@ import com.basira.domain.model.UserSettings
 import com.basira.domain.model.VisionAnalysisRequest
 import com.basira.domain.model.VisionAnalysisResult
 import com.basira.domain.model.WornStatus
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.CapturedImageArchive
 import com.basira.domain.repository.ConnectivityObserver
 import com.basira.domain.repository.DescriptionHistoryRepository
@@ -186,6 +189,19 @@ class FakeSettingsRepository(initial: UserSettings = UserSettings(consentAccepte
     val current: UserSettings get() = state.value
     override suspend fun update(transform: (UserSettings) -> UserSettings) {
         state.update(transform)
+    }
+}
+
+/** In-memory app language; the phone language is [systemLanguage]. */
+class FakeAppLanguageRepository(
+    private val systemLanguage: AppLanguage = AppLanguage.ARABIC,
+    initial: LanguagePreference = LanguagePreference.SYSTEM,
+) : AppLanguageRepository {
+    override val preference = MutableStateFlow(initial)
+    override val language = MutableStateFlow(AppLanguage.resolve(initial, listOf(systemLanguage.tag)))
+    override fun setPreference(preference: LanguagePreference) {
+        this.preference.value = preference
+        language.value = AppLanguage.resolve(preference, listOf(systemLanguage.tag))
     }
 }
 

@@ -6,7 +6,7 @@ import com.basira.domain.model.AnalysisMode
 import com.basira.domain.usecase.NoResultReason
 
 /**
- * Every user-visible state of the assistant. Each value has an Arabic announcement and a recovery
+ * Every user-visible state of the assistant. Each value has a spoken announcement and a recovery
  * action in the presentation layer.
  */
 sealed interface AssistantPhase {
@@ -46,11 +46,11 @@ sealed interface AssistantPhase {
     data class UnsupportedVersion(val target: UpdateTarget) : AssistantPhase
 
     /**
-     * Arabic speech cannot be produced.
+     * Speech in the app language cannot be produced.
      *
-     * @property arabicVoiceMissing `true` when an engine exists but lacks Arabic voice data.
+     * @property voiceMissing `true` when an engine exists but lacks voice data for the app language.
      */
-    data class SpeechUnavailable(val arabicVoiceMissing: Boolean) : AssistantPhase
+    data class SpeechUnavailable(val voiceMissing: Boolean) : AssistantPhase
 
     /** No internet connection. */
     data object Offline : AssistantPhase
@@ -155,8 +155,8 @@ sealed interface AssistantPhase {
             AppError.CameraPermissionRequired -> PermissionRequired
             AppError.CameraPermissionDenied -> PermissionDenied
             is AppError.IncompatibleVersion -> UnsupportedVersion(error.target)
-            AppError.TextToSpeechUnavailable -> SpeechUnavailable(arabicVoiceMissing = false)
-            AppError.ArabicVoiceMissing -> SpeechUnavailable(arabicVoiceMissing = true)
+            AppError.TextToSpeechUnavailable -> SpeechUnavailable(voiceMissing = false)
+            AppError.VoiceDataMissing -> SpeechUnavailable(voiceMissing = true)
             AppError.Offline -> Offline
             AppError.Timeout -> Timeout
             is AppError.RateLimited -> RateLimited(error.retryAfterMillis)

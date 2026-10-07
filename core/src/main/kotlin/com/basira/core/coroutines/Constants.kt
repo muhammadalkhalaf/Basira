@@ -2,9 +2,6 @@ package com.basira.core.coroutines
 
 /** Application-wide, non-secret constants that are independent of the Android framework. */
 object BasiraConstants {
-    /** Language code sent to the vision provider; descriptions are always requested in Arabic. */
-    const val RESPONSE_LANGUAGE: String = "ar"
-
     /** Maximum JPEG payload sent for analysis, in bytes (well below Gemini's 20 MB inline limit). */
     const val MAX_UPLOAD_BYTES: Int = 1_500_000
 

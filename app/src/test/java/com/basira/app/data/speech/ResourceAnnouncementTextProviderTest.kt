@@ -6,11 +6,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.basira.app.data.accessibility.AccessibilityStateProvider
 import com.basira.domain.assistant.Announcement
 import com.basira.domain.assistant.AssistantPhase
+import com.basira.domain.fakes.FakeAppLanguageRepository
 import com.basira.domain.model.AnalysisMode
 import com.basira.domain.model.AudioRoute
 import com.basira.domain.model.Confidence
+import com.basira.domain.model.LanguagePreference
 import com.basira.domain.model.SceneDescription
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,15 +23,29 @@ import org.robolectric.annotation.Config
 class ResourceAnnouncementTextProviderTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val provider = ResourceAnnouncementTextProvider(context, AccessibilityStateProvider(context))
+    private val appLanguage = FakeAppLanguageRepository(initial = LanguagePreference.ARABIC)
+    private val provider = ResourceAnnouncementTextProvider(context, AccessibilityStateProvider(context), appLanguage)
     private val arabicLetters = Regex("[\\u0600-\\u06FF]")
 
     @Test
     @Config(qualifiers = "en")
-    fun `spoken text is Arabic even when the UI language is English`() {
+    fun `spoken text follows the app language, not the configuration of the context`() {
         val text = provider.textFor(Announcement.Status(AssistantPhase.Offline))!!
         assertTrue(text, arabicLetters.containsMatchIn(text))
         assertTrue(text.contains("لا يوجد اتصال بالإنترنت"))
+    }
+
+    @Test
+    @Config(qualifiers = "ar")
+    fun `spoken text is English when the app language is English`() {
+        appLanguage.setPreference(LanguagePreference.ENGLISH)
+
+        val status = provider.textFor(Announcement.Status(AssistantPhase.Offline))!!
+        val find = provider.textFor(Announcement.CaptureStarted(AnalysisMode.FIND_OBJECT, "keys"))!!
+
+        assertFalse(status, arabicLetters.containsMatchIn(status))
+        assertFalse(find, arabicLetters.containsMatchIn(find))
+        assertTrue(find, find.contains("keys"))
     }
 
     @Test

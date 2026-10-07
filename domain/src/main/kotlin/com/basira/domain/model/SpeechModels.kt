@@ -5,14 +5,14 @@ enum class SpeechAvailability {
     /** The Text-to-Speech engine is still initializing. */
     INITIALIZING,
 
-    /** Arabic speech is available. */
+    /** Speech in the app language is available. */
     READY,
 
     /** No Text-to-Speech engine could be initialized. */
     ENGINE_UNAVAILABLE,
 
-    /** The engine works but Arabic voice data is missing. */
-    ARABIC_MISSING,
+    /** The engine works but voice data for the app language is missing. */
+    VOICE_MISSING,
 }
 
 /** Physical output used for spoken feedback. */
@@ -33,7 +33,7 @@ enum class AudioRoute {
 /**
  * Snapshot of the speech output subsystem.
  *
- * @property availability whether Arabic speech can be produced.
+ * @property availability whether speech in the app language can be produced.
  * @property isSpeaking whether an utterance is currently playing.
  * @property route current output route.
  */
@@ -63,7 +63,7 @@ enum class SpeechCompletion {
     /** The audio route (for example the glasses) disconnected during playback. */
     ROUTE_LOST,
 
-    /** The engine failed or Arabic is unavailable. */
+    /** The engine failed or the app language is unavailable. */
     FAILED,
 }
 

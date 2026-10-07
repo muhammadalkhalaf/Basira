@@ -14,6 +14,7 @@ import com.basira.domain.assistant.AssistantEngine
 import com.basira.domain.assistant.AssistantPhase
 import com.basira.domain.assistant.Announcement
 import com.basira.domain.assistant.SpeakingAnnouncer
+import com.basira.domain.fakes.FakeAppLanguageRepository
 import com.basira.domain.fakes.FakeConnectivityObserver
 import com.basira.domain.fakes.FakeHistoryRepository
 import com.basira.domain.fakes.FakeImageArchive
@@ -130,6 +131,7 @@ class AssistantFlowIntegrationTest {
             requestIds = { UUID.randomUUID().toString() },
             clock = { System.currentTimeMillis() },
             validator = DescriptionValidator(),
+            appLanguage = FakeAppLanguageRepository(),
         )
         return AssistantEngine(
             glasses = glasses,

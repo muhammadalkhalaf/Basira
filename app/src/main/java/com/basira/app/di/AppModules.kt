@@ -33,6 +33,7 @@ import com.basira.app.data.vision.gemini.GeminiVisionAnalysisRepository
 import com.basira.app.data.vision.gemini.MisconfiguredVisionAnalysisRepository
 import com.basira.app.data.vision.gemini.UploadCompletionInterceptor
 import com.basira.app.data.voice.AndroidVoiceCommandRecognizer
+import com.basira.app.localization.AndroidAppLanguageRepository
 import com.basira.core.coroutines.ApplicationScope
 import com.basira.core.coroutines.DispatcherProvider
 import com.basira.core.logging.AppLogger
@@ -41,6 +42,7 @@ import com.basira.core.retry.ExponentialBackoff
 import com.basira.domain.assistant.AnnouncementTextProvider
 import com.basira.domain.assistant.Announcer
 import com.basira.domain.assistant.SpeakingAnnouncer
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.CapturedImageArchive
 import com.basira.domain.repository.Clock
 import com.basira.domain.repository.ConnectivityObserver
@@ -106,6 +108,7 @@ abstract class BindingsModule {
     @Binds abstract fun voice(impl: AndroidVoiceCommandRecognizer): VoiceCommandRecognizer
     @Binds abstract fun phoneLocator(impl: AndroidPhoneLocator): PhoneLocator
     @Binds abstract fun settings(impl: DataStoreSettingsRepository): SettingsRepository
+    @Binds abstract fun appLanguage(impl: AndroidAppLanguageRepository): AppLanguageRepository
     @Binds abstract fun history(impl: DataStoreDescriptionHistoryRepository): DescriptionHistoryRepository
     @Binds abstract fun archive(impl: FileCapturedImageArchive): CapturedImageArchive
     @Binds abstract fun announcementTexts(impl: ResourceAnnouncementTextProvider): AnnouncementTextProvider

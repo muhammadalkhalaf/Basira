@@ -4,7 +4,9 @@ import com.basira.app.presentation.settings.SettingsDialog
 import com.basira.app.presentation.settings.SettingsViewModel
 import com.basira.app.testutil.TestEngine
 import com.basira.domain.model.AnalysisMode
+import com.basira.domain.model.AppLanguage
 import com.basira.domain.model.Confidence
+import com.basira.domain.model.LanguagePreference
 import com.basira.domain.model.SceneDescription
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +39,7 @@ class SettingsViewModelTest {
         Dispatchers.setMain(dispatcher)
         scope = CoroutineScope(SupervisorJob() + dispatcher)
         fixture = TestEngine(scope)
-        viewModel = SettingsViewModel(fixture.settings, fixture.history, fixture.archive, fixture.engine)
+        viewModel = SettingsViewModel(fixture.settings, fixture.history, fixture.archive, fixture.engine, fixture.appLanguage)
     }
 
     @After
@@ -76,5 +78,16 @@ class SettingsViewModelTest {
         viewModel.setSaveHistory(false)
         advanceUntilIdle()
         assertTrue(fixture.history.history.first().isEmpty())
+    }
+
+    @Test
+    fun `choosing a language applies it and shows it as selected`() = runTest(dispatcher) {
+        assertEquals(LanguagePreference.SYSTEM, viewModel.uiState.first().language)
+
+        viewModel.setLanguage(LanguagePreference.ENGLISH)
+        advanceUntilIdle()
+
+        assertEquals(AppLanguage.ENGLISH, fixture.appLanguage.language.value)
+        assertEquals(LanguagePreference.ENGLISH, viewModel.uiState.first { it.language == LanguagePreference.ENGLISH }.language)
     }
 }

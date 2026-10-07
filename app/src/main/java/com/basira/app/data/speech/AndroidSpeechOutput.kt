@@ -11,10 +11,12 @@ import com.basira.core.reporting.ErrorDomain
 import com.basira.core.reporting.ErrorReport
 import com.basira.core.reporting.ErrorReporter
 import com.basira.core.reporting.ErrorSeverity
+import com.basira.domain.model.AppLanguage
 import com.basira.domain.model.SpeechAvailability
 import com.basira.domain.model.SpeechCompletion
 import com.basira.domain.model.SpeechOutputState
 import com.basira.domain.model.SpeechQueueMode
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.SettingsRepository
 import com.basira.domain.repository.SpeechOutput
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,8 +43,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 /**
  * [SpeechOutput] backed by Android [TextToSpeech].
  *
- * - Arabic support is verified with [TextToSpeech.isLanguageAvailable]; when data is missing the state
- *   becomes [SpeechAvailability.ARABIC_MISSING] and nothing is spoken in another language.
+ * - Speech uses the app language ([AppLanguageRepository.language]) and switches when it changes.
+ *   Support is verified with [TextToSpeech.isLanguageAvailable]; when data is missing the state
+ *   becomes [SpeechAvailability.VOICE_MISSING] and nothing is spoken in another language.
  * - Speech uses [AudioRouteManager.speechAttributes], so it follows a connected Bluetooth output such
  *   as the glasses, and holds ducking audio focus only while speaking.
  * - When the Bluetooth route disappears mid-utterance, playback stops and the utterance completes with
@@ -54,6 +58,7 @@ class AndroidSpeechOutput @Inject constructor(
     private val routes: AudioRouteManager,
     private val focus: AudioFocusController,
     settings: SettingsRepository,
+    private val appLanguage: AppLanguageRepository,
     @param:ApplicationScope private val scope: CoroutineScope,
     private val errorReporter: ErrorReporter,
 ) : SpeechOutput {
@@ -103,6 +108,8 @@ class AndroidSpeechOutput @Inject constructor(
                 tts?.setSpeechRate(rate)
             }
         }
+        // The current language is applied by initialize(); later changes re-check the voice data.
+        scope.launch { appLanguage.language.drop(1).collect { refreshAvailability() } }
     }
 
     override suspend fun speak(text: String, queueMode: SpeechQueueMode): SpeechCompletion {
@@ -159,12 +166,14 @@ class AndroidSpeechOutput @Inject constructor(
             _state.update { it.copy(availability = SpeechAvailability.ENGINE_UNAVAILABLE) }
             return
         }
-        val availability = engine.isLanguageAvailable(ARABIC)
+        val language = appLanguage.language.value
+        val locale = Locale.forLanguageTag(language.tag)
+        val availability = engine.isLanguageAvailable(locale)
         if (availability == TextToSpeech.LANG_MISSING_DATA || availability == TextToSpeech.LANG_NOT_SUPPORTED ||
-            engine.setLanguage(ARABIC) < TextToSpeech.LANG_AVAILABLE
+            engine.setLanguage(locale) < TextToSpeech.LANG_AVAILABLE
         ) {
-            reportTts("tts.arabicVoice", ErrorSeverity.ERROR, "voice_install_offered", reason = "availability_$availability")
-            _state.update { it.copy(availability = SpeechAvailability.ARABIC_MISSING) }
+            reportTts("tts.voice", ErrorSeverity.ERROR, "voice_install_offered", reason = "availability_$availability", language)
+            _state.update { it.copy(availability = SpeechAvailability.VOICE_MISSING) }
             return
         }
         engine.setAudioAttributes(routes.speechAttributes)
@@ -174,7 +183,13 @@ class AndroidSpeechOutput @Inject constructor(
     }
 
     /** Reports a TTS failure together with the engine it happened on, which is what decides the fix. */
-    private fun reportTts(operation: String, severity: ErrorSeverity, outcome: String, reason: String) {
+    private fun reportTts(
+        operation: String,
+        severity: ErrorSeverity,
+        outcome: String,
+        reason: String,
+        language: AppLanguage = appLanguage.language.value,
+    ) {
         errorReporter.report(
             ErrorReport(
                 domain = ErrorDomain.AUDIO,
@@ -182,7 +197,7 @@ class AndroidSpeechOutput @Inject constructor(
                 severity = severity,
                 outcome = outcome,
                 reason = reason,
-                attributes = mapOf("tts.engine" to (tts?.defaultEngine ?: "none")),
+                attributes = mapOf("tts.engine" to (tts?.defaultEngine ?: "none"), "tts.language" to language.tag),
             ),
         )
     }
@@ -214,6 +229,5 @@ class AndroidSpeechOutput @Inject constructor(
 
     private companion object {
         const val INIT_TIMEOUT_MILLIS = 8_000L
-        val ARABIC: Locale = Locale.forLanguageTag("ar")
     }
 }

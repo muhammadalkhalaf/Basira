@@ -130,7 +130,10 @@ class GeminiVisionAnalysisRepository(
     private fun buildRequest(request: VisionAnalysisRequest): GeminiInteractionRequest = GeminiInteractionRequest(
         model = config.model,
         input = listOf(
-            GeminiInputContent(type = "text", text = prompts.userPrompt(request.mode, request.verbosity, request.targetObject)),
+            GeminiInputContent(
+                type = "text",
+                text = prompts.userPrompt(request.mode, request.verbosity, request.targetObject, request.language),
+            ),
             GeminiInputContent(type = "image", data = base64Encoder(request.image.jpegBytes), mimeType = JPEG_MIME_TYPE),
         ),
         systemInstruction = prompts.systemInstruction,

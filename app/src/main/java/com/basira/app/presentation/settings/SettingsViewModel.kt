@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.basira.app.core.BuildModes
 import com.basira.domain.assistant.AssistantAction
 import com.basira.domain.assistant.AssistantEngine
+import com.basira.domain.model.LanguagePreference
 import com.basira.domain.model.UserSettings
 import com.basira.domain.model.Verbosity
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.CapturedImageArchive
 import com.basira.domain.repository.DescriptionHistoryRepository
 import com.basira.domain.repository.SettingsRepository
@@ -34,6 +36,7 @@ enum class SettingsDialog {
  * Immutable settings state.
  *
  * @property settings persisted settings.
+ * @property language the app language choice.
  * @property historyCount stored descriptions.
  * @property imageCount stored photos.
  * @property dialog visible dialog.
@@ -44,6 +47,7 @@ enum class SettingsDialog {
  */
 data class SettingsUiState(
     val settings: UserSettings = UserSettings(),
+    val language: LanguagePreference = LanguagePreference.SYSTEM,
     val historyCount: Int = 0,
     val imageCount: Int = 0,
     val dialog: SettingsDialog? = null,
@@ -60,14 +64,15 @@ class SettingsViewModel @Inject constructor(
     private val history: DescriptionHistoryRepository,
     private val archive: CapturedImageArchive,
     private val engine: AssistantEngine,
+    private val appLanguage: AppLanguageRepository,
 ) : ViewModel() {
 
     private val local = MutableStateFlow(SettingsUiState())
 
     /** Screen state. */
     val uiState: StateFlow<SettingsUiState> =
-        combine(local, settings.settings, history.history, engine.state) { base, current, entries, assistant ->
-            base.copy(settings = current, historyCount = entries.size, sessionActive = assistant.sessionActive)
+        combine(local, settings.settings, history.history, engine.state, appLanguage.preference) { base, current, entries, assistant, language ->
+            base.copy(settings = current, language = language, historyCount = entries.size, sessionActive = assistant.sessionActive)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     init {
@@ -79,6 +84,15 @@ class SettingsViewModel @Inject constructor(
      */
     fun setDetailed(detailed: Boolean) =
         engine.dispatch(AssistantAction.SetVerbosity(if (detailed) Verbosity.DETAILED else Verbosity.SHORT))
+
+    /**
+     * Switches the language of the screens, speech, voice commands, and descriptions.
+     *
+     * @param preference the new choice.
+     */
+    fun setLanguage(preference: LanguagePreference) {
+        if (preference != appLanguage.preference.value) appLanguage.setPreference(preference)
+    }
 
     /**
      * @param rate new speech rate multiplier.

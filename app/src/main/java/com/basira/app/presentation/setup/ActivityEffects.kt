@@ -81,11 +81,11 @@ class EnvironmentRefresher @Inject constructor(
     private val dat: Provider<DatGlassesRepository>,
     private val speech: SpeechOutput,
 ) {
-    /** Re-reads Meta AI installation, SDK initialization, and Arabic voice availability. */
+    /** Re-reads Meta AI installation, SDK initialization, and voice availability. */
     fun refresh() {
         if (BuildModes.glassesMode != "fake") dat.get().refreshEnvironment()
         val availability = speech.state.value.availability
-        if (availability == SpeechAvailability.ARABIC_MISSING || availability == SpeechAvailability.ENGINE_UNAVAILABLE) {
+        if (availability == SpeechAvailability.VOICE_MISSING || availability == SpeechAvailability.ENGINE_UNAVAILABLE) {
             speech.refreshAvailability()
         }
     }

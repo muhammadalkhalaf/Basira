@@ -1,9 +1,9 @@
 # Basira (بصيرة)
 
-Basira is a native Android app that helps blind and low-vision Arabic speakers understand their
+Basira is a native Android app that helps blind and low-vision Arabic (and English) speakers understand their
 surroundings with Ray-Ban Meta glasses. On request it captures one still photo from the glasses camera
 through the Meta Wearables Device Access Toolkit (DAT), sends it **directly from the phone to Google's
-Gemini API**, and speaks a short Arabic description with Android Text-to-Speech, preferably through
+Gemini API**, and speaks a short description in the app language (Arabic or English) with Android Text-to-Speech, preferably through
 the glasses speakers. No application backend is used. Release builds report crashes, non-fatal
 errors, and basic usage to Firebase (Crashlytics and Analytics); images are never sent there.
 
@@ -43,7 +43,8 @@ Supported:
 - "Where is my phone?" alarm sound (30 s maximum).
 - Spoken status at start-up and after every environmental change; explicit announcement when audio
   comes from the phone instead of the glasses.
-- Arabic plural forms, Arabic RTL layout, English fallback UI.
+- Arabic and English UI with a manual language choice in Settings (Phone language / العربية /
+  English); Arabic plural forms, Arabic RTL layout, English fallback for other phone languages.
 
 Not supported (by design or because the SDK does not offer it to third parties):
 
@@ -81,8 +82,8 @@ States: Initializing, Meta AI missing, Bluetooth permission required, registrati
 registering, glasses unavailable, glasses disconnected, permission required, permission denied,
 ready, listening, capturing, uploading, analyzing, speaking, loaded, empty result, offline, timeout,
 rate limited, authentication expired, unsupported version (firmware, glasses app, this app), speech
-unavailable (engine or Arabic voice), invalid image, invalid server response, recoverable error,
-fatal error. Each has an Arabic announcement and a recovery action (`localization/PhaseStrings.kt`).
+unavailable (engine or voice of the app language), invalid image, invalid server response, recoverable error,
+fatal error. Each has a spoken announcement and a recovery action (`localization/PhaseStrings.kt`).
 
 ## DAT integration
 
@@ -315,9 +316,12 @@ See [docs/MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) for TalkBack and hardwa
   error, busy, and listening.
 - High-contrast dark theme (yellow/white on black), scalable `sp` typography, status shown with icon
   and text, never by color alone.
-- Spoken output is always Arabic. If Arabic TTS data is missing the app says so, offers to install it,
-  and never silently switches to another language. Play language splits are disabled so Arabic
-  resources are present on every device.
+- Spoken output, voice commands, and Gemini descriptions always use the app language, the same
+  language as the screen: the choice in Settings, or else the first supported phone language
+  (English when the phone language is neither). On Android 13+ the choice is the system per-app
+  language. If TTS data for that language is missing the app says so, offers to install it, and never
+  silently switches to another language. Play language splits are disabled so both languages are
+  present on every device for the in-app switch.
 
 ## Security and privacy
 

@@ -84,7 +84,7 @@ sealed interface Announcement {
     data object SessionEnded : Announcement
 }
 
-/** Converts [Announcement] values to localized Arabic text. Implemented with app resources. */
+/** Converts [Announcement] values to text in the app language. Implemented with app resources. */
 fun interface AnnouncementTextProvider {
     /**
      * @param announcement what to say.

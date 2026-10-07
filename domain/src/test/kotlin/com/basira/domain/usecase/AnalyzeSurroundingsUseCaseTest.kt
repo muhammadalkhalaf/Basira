@@ -2,6 +2,7 @@ package com.basira.domain.usecase
 
 import com.basira.core.error.AppError
 import com.basira.core.result.AppResult
+import com.basira.domain.fakes.FakeAppLanguageRepository
 import com.basira.domain.fakes.FakeConnectivityObserver
 import com.basira.domain.fakes.FakeGlassesRepositoryForTest
 import com.basira.domain.fakes.FakeImageArchive
@@ -9,6 +10,7 @@ import com.basira.domain.fakes.FakeVisionRepository
 import com.basira.domain.model.AnalysisMode
 import com.basira.domain.model.Confidence
 import com.basira.domain.model.ConnectivityStatus
+import com.basira.domain.model.LanguagePreference
 import com.basira.domain.model.Verbosity
 import com.basira.domain.model.VisionAnalysisResult
 import kotlinx.coroutines.flow.toList
@@ -23,6 +25,7 @@ class AnalyzeSurroundingsUseCaseTest {
     private val vision = FakeVisionRepository()
     private val connectivity = FakeConnectivityObserver()
     private val archive = FakeImageArchive()
+    private val appLanguage = FakeAppLanguageRepository()
     private var nextId = 0
     private val useCase = AnalyzeSurroundingsUseCase(
         glasses = glasses,
@@ -32,6 +35,7 @@ class AnalyzeSurroundingsUseCaseTest {
         requestIds = { "req-${++nextId}" },
         clock = { 1_000L },
         validator = DescriptionValidator(),
+        appLanguage = appLanguage,
     )
 
     @Test
@@ -45,6 +49,15 @@ class AnalyzeSurroundingsUseCaseTest {
         assertEquals("req-1", completed.description.requestId)
         assertEquals("ar", vision.requests.single().language)
         assertEquals(1, archive.saveCalls)
+    }
+
+    @Test
+    fun `descriptions are requested in the app language`() = runTest {
+        appLanguage.setPreference(LanguagePreference.ENGLISH)
+
+        useCase(AnalysisMode.SCENE_DESCRIPTION, null, Verbosity.SHORT).toList()
+
+        assertEquals("en", vision.requests.single().language)
     }
 
     @Test

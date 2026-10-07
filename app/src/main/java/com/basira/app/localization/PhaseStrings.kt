@@ -47,8 +47,8 @@ enum class SetupAction(@param:StringRes val label: Int) {
     /** Open the on-glasses DAT app update in Meta AI. */
     UPDATE_GLASSES_APP(R.string.setup_update_glasses_app),
 
-    /** Ask the TTS engine to install Arabic voice data. */
-    INSTALL_ARABIC_VOICE(R.string.setup_install_arabic_voice),
+    /** Ask the TTS engine to install voice data for the app language. */
+    INSTALL_VOICE(R.string.setup_install_voice),
 
     /** Open system text-to-speech settings. */
     OPEN_TTS_SETTINGS(R.string.setup_open_tts_settings),
@@ -78,8 +78,8 @@ object PhaseStrings {
             UpdateTarget.THIS_APP -> PhaseText(R.string.status_update_this_app_title, R.string.status_update_this_app_detail)
         }
         is AssistantPhase.SpeechUnavailable ->
-            if (phase.arabicVoiceMissing) {
-                PhaseText(R.string.status_arabic_missing_title, R.string.status_arabic_missing_detail)
+            if (phase.voiceMissing) {
+                PhaseText(R.string.status_voice_missing_title, R.string.status_voice_missing_detail)
             } else {
                 PhaseText(R.string.status_tts_missing_title, R.string.status_tts_missing_detail)
             }
@@ -142,7 +142,7 @@ object PhaseStrings {
             UpdateTarget.THIS_APP -> null
         }
         is AssistantPhase.SpeechUnavailable ->
-            if (phase.arabicVoiceMissing) SetupAction.INSTALL_ARABIC_VOICE else SetupAction.OPEN_TTS_SETTINGS
+            if (phase.voiceMissing) SetupAction.INSTALL_VOICE else SetupAction.OPEN_TTS_SETTINGS
         else -> null
     }
 

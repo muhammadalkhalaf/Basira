@@ -123,8 +123,8 @@ android {
         generateLocaleConfig = true
     }
 
-    // Spoken output always uses Arabic resources, even when the UI language is English, so Play
-    // language splits must not strip values-ar from devices set to another language.
+    // The language can be switched inside the app (Settings > Language), so Play language splits must
+    // not strip values-ar or the English resources from devices set to another language.
     bundle {
         language { enableSplit = false }
     }

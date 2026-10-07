@@ -94,8 +94,8 @@ sealed interface AppError {
     /** No Text-to-Speech engine is installed or it failed to initialize. */
     data object TextToSpeechUnavailable : AppError
 
-    /** A Text-to-Speech engine exists but has no Arabic voice data installed. */
-    data object ArabicVoiceMissing : AppError
+    /** A Text-to-Speech engine exists but has no voice data for the app language installed. */
+    data object VoiceDataMissing : AppError
 
     /** Speech recognition is unavailable on this phone. */
     data object SpeechRecognitionUnavailable : AppError

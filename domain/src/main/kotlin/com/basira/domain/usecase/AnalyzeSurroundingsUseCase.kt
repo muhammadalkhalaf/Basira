@@ -8,6 +8,7 @@ import com.basira.domain.model.ConnectivityStatus
 import com.basira.domain.model.VisionAnalysisRequest
 import com.basira.domain.model.VisionAnalysisResult
 import com.basira.domain.model.Verbosity
+import com.basira.domain.repository.AppLanguageRepository
 import com.basira.domain.repository.CapturedImageArchive
 import com.basira.domain.repository.Clock
 import com.basira.domain.repository.ConnectivityObserver
@@ -20,7 +21,8 @@ import kotlinx.coroutines.flow.channelFlow
 
 /**
  * Shared pipeline behind every assistance mode: check connectivity, capture one photo, optionally
- * archive it (explicit opt-in only), upload it, and validate the answer.
+ * archive it (explicit opt-in only), upload it, and validate the answer. The answer is requested in
+ * the app language, which is also the language it is spoken in.
  *
  * The returned flow is cold: each collection performs exactly one capture. Cancelling the collector
  * cancels the capture or the HTTP call that is in progress. Nothing is retried after connectivity
@@ -34,6 +36,7 @@ class AnalyzeSurroundingsUseCase @Inject constructor(
     private val requestIds: RequestIdGenerator,
     private val clock: Clock,
     private val validator: DescriptionValidator,
+    private val appLanguage: AppLanguageRepository,
 ) {
 
     /**
@@ -78,7 +81,7 @@ class AnalyzeSurroundingsUseCase @Inject constructor(
             image = image,
             mode = mode,
             targetObject = target.takeIf { mode == AnalysisMode.FIND_OBJECT },
-            language = BasiraConstants.RESPONSE_LANGUAGE,
+            language = appLanguage.language.value.tag,
             verbosity = verbosity,
             requestId = requestId,
         )

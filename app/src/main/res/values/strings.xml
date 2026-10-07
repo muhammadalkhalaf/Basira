@@ -4,7 +4,7 @@
 
     <!-- Status titles and recovery details. Spoken as "title. detail". -->
     <string name="status_initializing_title">Starting</string>
-    <string name="status_initializing_detail">Checking the glasses, the internet and the Arabic voice.</string>
+    <string name="status_initializing_detail">Checking the glasses, the internet and the English voice.</string>
     <string name="status_meta_ai_missing_title">Meta AI app is not installed</string>
     <string name="status_meta_ai_missing_detail">Meta AI is required to pair the glasses, connect this app and allow the camera. Use the Install Meta AI button.</string>
     <string name="status_bluetooth_title">Nearby devices permission needed</string>
@@ -28,9 +28,9 @@
     <string name="status_update_this_app_title">This app needs an update</string>
     <string name="status_update_this_app_detail">This version is no longer compatible with your glasses. Install the latest version of Basira.</string>
     <string name="status_tts_missing_title">No speech engine</string>
-    <string name="status_tts_missing_detail">Install a text to speech app that supports Arabic, such as Speech Services by Google, then return to this app.</string>
-    <string name="status_arabic_missing_title">Arabic voice not installed</string>
-    <string name="status_arabic_missing_detail">Press Install Arabic voice and download the Arabic voice data. The app does not speak in another language instead.</string>
+    <string name="status_tts_missing_detail">Install a text to speech app that supports English, such as Speech Services by Google, then return to this app.</string>
+    <string name="status_voice_missing_title">English voice not installed</string>
+    <string name="status_voice_missing_detail">Press Install English voice and download the English voice data. The app does not speak in another language instead.</string>
     <string name="status_offline_title">No internet connection</string>
     <string name="status_offline_detail">Descriptions need the internet. Connect to Wi-Fi or mobile data.</string>
     <string name="status_ready_title">Ready</string>
@@ -151,7 +151,7 @@
     <string name="setup_allow_camera">Allow camera</string>
     <string name="setup_update_glasses">Update glasses in Meta AI</string>
     <string name="setup_update_glasses_app">Update glasses app</string>
-    <string name="setup_install_arabic_voice">Install Arabic voice</string>
+    <string name="setup_install_voice">Install English voice</string>
     <string name="setup_open_tts_settings">Open speech settings</string>
     <string name="setup_allow_notifications">Allow notifications</string>
     <string name="setup_start_session">Start glasses session</string>
@@ -177,7 +177,7 @@
     <string name="onboarding_next">Next</string>
     <string name="onboarding_back">Back</string>
     <string name="onboarding_welcome_title">Welcome to Basira</string>
-    <string name="onboarding_welcome_body">Basira describes your surroundings using the camera of your Ray-Ban Meta glasses and speaks in Arabic. This setup works with TalkBack and takes a few minutes.</string>
+    <string name="onboarding_welcome_body">Basira describes your surroundings using the camera of your Ray-Ban Meta glasses and speaks in the app language, English or Arabic, which you can change in Settings. This setup works with TalkBack and takes a few minutes.</string>
     <string name="onboarding_consent_title">Privacy and safety</string>
     <string name="consent_point_capture">The glasses camera captures your surroundings when you ask for a description.</string>
     <string name="consent_point_people">Photos may include other people and private information.</string>
@@ -196,13 +196,13 @@
     <string name="check_registration">Connected to Meta AI</string>
     <string name="check_glasses">Glasses connected</string>
     <string name="check_camera">Camera allowed</string>
-    <string name="check_voice">Arabic voice</string>
+    <string name="check_voice">English voice</string>
     <string name="check_state_done">done</string>
     <string name="check_state_needed">needed</string>
     <string name="check_state_checking">checking</string>
     <string name="check_row">%1$s: %2$s</string>
-    <string name="onboarding_voice_title">Arabic voice</string>
-    <string name="onboarding_voice_body">Basira speaks with the Arabic voice of your phone. Play the test sentence to check it.</string>
+    <string name="onboarding_voice_title">English voice</string>
+    <string name="onboarding_voice_body">Basira speaks with the English voice of your phone. Play the test sentence to check it.</string>
     <string name="onboarding_voice_test">Play test sentence</string>
     <string name="onboarding_done_title">All set</string>
     <string name="onboarding_done_body">Press Start. The large main button describes what is in front of you. You can also use the notification or a voice command.</string>
@@ -212,6 +212,11 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="navigate_back">Back</string>
+    <string name="settings_language_heading">Language</string>
+    <string name="settings_language_summary">Basira shows its screens, speaks, and describes in this language.</string>
+    <string name="settings_language_system">Phone language</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_language_english">English</string>
     <string name="settings_descriptions_heading">Descriptions</string>
     <string name="settings_speech_rate">Speech rate</string>
     <string name="settings_speech_rate_value">%1$d%%</string>

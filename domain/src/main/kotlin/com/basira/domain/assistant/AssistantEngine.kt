@@ -281,7 +281,7 @@ class AssistantEngine @Inject constructor(
         return when {
             availability == SpeechAvailability.INITIALIZING || inputs.glasses.isResolving -> AssistantPhase.Initializing
             availability == SpeechAvailability.ENGINE_UNAVAILABLE -> AssistantPhase.SpeechUnavailable(false)
-            availability == SpeechAvailability.ARABIC_MISSING -> AssistantPhase.SpeechUnavailable(true)
+            availability == SpeechAvailability.VOICE_MISSING -> AssistantPhase.SpeechUnavailable(true)
             inputs.glasses.isRegistering -> AssistantPhase.Registering
             else -> inputs.glasses.blockingIssue()?.let(AssistantPhase::fromError)
                 ?: if (inputs.connectivity == ConnectivityStatus.OFFLINE) AssistantPhase.Offline else AssistantPhase.Ready

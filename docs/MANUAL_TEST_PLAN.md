@@ -10,8 +10,8 @@ Build: `./gradlew :app:installDebug` (bundled sample images, sample descriptions
 1. First launch: TalkBack reads "Step 1 of 5" and the welcome heading; Next is reachable by swiping.
 2. Consent: all seven statements are read; "Exit" closes the app; "I understand and agree" continues.
 3. Setup checklist: every row reads "label: done/needed"; each needed row has a button.
-4. Arabic voice: "Play test sentence" speaks Arabic. With Arabic TTS data removed, the row says
-   "needed" and "Install Arabic voice" opens the installer; no English voice is used instead.
+4. Voice: "Play test sentence" speaks in the app language. With that language's TTS data removed,
+   the row says "needed" and "Install … voice" opens the installer; no other voice is used instead.
 5. Finish: "Start" opens the main screen; the app speaks the status including the simulation warning.
 6. Main screen order by swiping: app name, simulation banners, status, describe button, repeat,
    voice command, more options, last description, utilities.
@@ -30,7 +30,11 @@ Build: `./gradlew :app:installDebug` (bundled sample images, sample descriptions
 15. Settings: switches announce On/Off; enabling "Save captured photos" asks for confirmation;
     "Delete history and saved photos" asks for confirmation and announces completion.
 16. Font size at maximum and display size at maximum: no clipped text, everything scrollable.
-17. Language set to English: UI in English, speech still Arabic.
+17. Language: Settings > Language offers Phone language, العربية, and English; TalkBack reads each as
+    a radio button with its state. Choosing English switches the screens, spoken status, voice
+    commands, and descriptions to English at once; choosing العربية switches all of them back to Arabic.
+    With "Phone language", a phone set to Arabic gives Arabic and a phone set to English (or Turkish)
+    gives English. On Android 13+ the choice also appears in Settings > Apps > Basira > Language.
 
 ## B. With Ray-Ban Meta glasses (real build)
 

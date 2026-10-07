@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -18,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +30,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.basira.app.presentation.theme.Dimens
@@ -179,5 +182,36 @@ fun LabeledSwitch(
         Spacer(Modifier.width(12.dp))
         // The row is the toggleable element; the switch itself is purely visual.
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/**
+ * Radio row whose whole area is one selectable element, announced with its label and selection
+ * state. Place rows inside a container with `Modifier.selectableGroup()`.
+ *
+ * @param label visible label; may carry a locale span so TalkBack pronounces it in its own language.
+ * @param selected whether this option is chosen.
+ * @param onSelect called when the row is chosen.
+ * @param modifier layout modifier.
+ */
+@Composable
+fun LabeledRadioButton(
+    label: AnnotatedString,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = Dimens.ActionHeight)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The row is the selectable element; the radio button itself is purely visual.
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground)
     }
 }

@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Spoken output, preferably routed to the glasses speakers.
  *
- * Implementations never switch silently to a non-Arabic voice: when Arabic is unavailable,
+ * Speech always uses the app language ([AppLanguageRepository.language]). Implementations never
+ * switch silently to a voice of another language: when that language is unavailable,
  * [state] reports it and [speak] returns [SpeechCompletion.FAILED].
  */
 interface SpeechOutput {
@@ -24,7 +25,7 @@ interface SpeechOutput {
      *
      * Cancelling the calling coroutine stops playback.
      *
-     * @param text Arabic text to speak.
+     * @param text text in the app language.
      * @param queueMode whether to interrupt or queue after the current utterance.
      * @return how playback ended.
      */
@@ -33,7 +34,7 @@ interface SpeechOutput {
     /** Stops any current or queued utterance immediately and releases audio focus. */
     fun stop()
 
-    /** Re-checks the Text-to-Speech engine, for example after the user installed Arabic voice data. */
+    /** Re-checks the Text-to-Speech engine, for example after the user installed voice data. */
     fun refreshAvailability()
 }
 

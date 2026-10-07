@@ -136,6 +136,7 @@ private fun SettingsRoute(navController: NavHostController) {
         state = state,
         callbacks = SettingsCallbacks(
             onBack = { navController.popBackStack() },
+            onLanguage = viewModel::setLanguage,
             onDetailed = viewModel::setDetailed,
             onSpeechRate = viewModel::setSpeechRate,
             onSaveHistory = viewModel::setSaveHistory,

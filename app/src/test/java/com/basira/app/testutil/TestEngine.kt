@@ -2,6 +2,7 @@ package com.basira.app.testutil
 
 import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.domain.assistant.AssistantEngine
+import com.basira.domain.fakes.FakeAppLanguageRepository
 import com.basira.domain.fakes.FakeConnectivityObserver
 import com.basira.domain.fakes.FakeGlassesRepositoryForTest
 import com.basira.domain.fakes.FakeHistoryRepository
@@ -32,10 +33,11 @@ class TestEngine(scope: CoroutineScope) {
     val history = FakeHistoryRepository()
     val archive = FakeImageArchive()
     val voice = FakeVoiceRecognizer()
+    val appLanguage = FakeAppLanguageRepository()
     private var ids = 0
 
     private val analyze = AnalyzeSurroundingsUseCase(
-        glasses, vision, FakeConnectivityObserver(), archive, { "req-${++ids}" }, { 0L }, DescriptionValidator(),
+        glasses, vision, FakeConnectivityObserver(), archive, { "req-${++ids}" }, { 0L }, DescriptionValidator(), appLanguage,
     )
 
     val engine = AssistantEngine(

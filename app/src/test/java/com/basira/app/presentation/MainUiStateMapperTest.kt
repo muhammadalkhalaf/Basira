@@ -64,7 +64,7 @@ class MainUiStateMapperTest {
         assertEquals(SetupAction.ALLOW_CAMERA, map(AssistantState(phase = AssistantPhase.PermissionDenied)).setupAction)
         assertEquals(SetupAction.CONNECT_META_AI, map(AssistantState(phase = AssistantPhase.RegistrationRequired)).setupAction)
         assertEquals(SetupAction.INSTALL_META_AI, map(AssistantState(phase = AssistantPhase.MetaAiMissing)).setupAction)
-        assertEquals(SetupAction.INSTALL_ARABIC_VOICE, map(AssistantState(phase = AssistantPhase.SpeechUnavailable(true))).setupAction)
+        assertEquals(SetupAction.INSTALL_VOICE, map(AssistantState(phase = AssistantPhase.SpeechUnavailable(true))).setupAction)
         assertFalse(map(AssistantState(phase = AssistantPhase.PermissionDenied)).canRetry)
         assertNull(map(AssistantState(phase = AssistantPhase.FatalError(AppError.Forbidden))).setupAction)
     }

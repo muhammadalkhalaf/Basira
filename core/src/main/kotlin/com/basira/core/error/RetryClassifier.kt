@@ -43,7 +43,7 @@ object RetryClassifier {
         AppError.BluetoothPermissionRequired,
         is AppError.IncompatibleVersion,
         AppError.TextToSpeechUnavailable,
-        AppError.ArabicVoiceMissing,
+        AppError.VoiceDataMissing,
         AppError.Forbidden,
         AppError.ServiceNotConfigured,
         AppError.ApiKeyRejected,
