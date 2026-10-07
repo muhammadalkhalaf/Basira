@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- AAPT2 only keeps <adaptive-icon> in a -v26 qualified folder; the qualifier is required. -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+    <!-- targetSdk 36 matches the official DAT 1.0.0 CameraAccess sample; raise after hardware testing. -->
+    <issue id="OldTargetApi" severity="informational" />
+</lint>
