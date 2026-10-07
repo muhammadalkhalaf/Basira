@@ -9,7 +9,10 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.basira.core.coroutines.DispatcherProvider
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.model.AnalysisMode
 import com.basira.domain.model.CapturedImage
 import com.basira.domain.model.Confidence
@@ -41,10 +44,15 @@ private val Context.historyDataStore: DataStore<Preferences> by preferencesDataS
 @Singleton
 class DataStoreSettingsRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val errorReporter: ErrorReporter,
 ) : SettingsRepository {
 
     override val settings: Flow<UserSettings> = context.settingsDataStore.data
-        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .catch {
+            if (it !is IOException) throw it
+            errorReporter.reportStorage("settings.read", ErrorSeverity.ERROR, "defaults_used", throwable = it)
+            emit(androidx.datastore.preferences.core.emptyPreferences())
+        }
         .map(::toSettings)
 
     override suspend fun update(transform: (UserSettings) -> UserSettings) {
@@ -61,7 +69,7 @@ class DataStoreSettingsRepository @Inject constructor(
     }
 
     private fun toSettings(preferences: Preferences) = UserSettings(
-        verbosity = preferences[VERBOSITY]?.let { runCatching { Verbosity.valueOf(it) }.getOrNull() } ?: Verbosity.SHORT,
+        verbosity = preferences[VERBOSITY]?.let(::readVerbosity) ?: Verbosity.SHORT,
         consentAccepted = preferences[CONSENT] ?: false,
         onboardingCompleted = preferences[ONBOARDING] ?: false,
         saveHistory = preferences[SAVE_HISTORY] ?: false,
@@ -69,6 +77,13 @@ class DataStoreSettingsRepository @Inject constructor(
         mediaButtonEnabled = preferences[MEDIA_BUTTON] ?: false,
         speechRate = preferences[SPEECH_RATE] ?: 1.0f,
     )
+
+    private fun readVerbosity(stored: String): Verbosity? =
+        Verbosity.entries.firstOrNull { it.name == stored }
+            ?: run {
+                errorReporter.reportUnreadableValue("settings.verbosity", stored)
+                null
+            }
 
     private companion object {
         const val MIN_RATE = 0.5f
@@ -102,14 +117,18 @@ private data class HistoryEntry(
 class DataStoreDescriptionHistoryRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : DescriptionHistoryRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = ListSerializer(HistoryEntry.serializer())
 
     override val history: Flow<List<SceneDescription>> = context.historyDataStore.data
-        .catch { if (it is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw it }
+        .catch {
+            if (it !is IOException) throw it
+            errorReporter.reportStorage("history.read", ErrorSeverity.ERROR, "history_shown_empty", throwable = it)
+            emit(androidx.datastore.preferences.core.emptyPreferences())
+        }
         .map { preferences -> decode(preferences[ENTRIES]).map(::toDomain) }
 
     override suspend fun add(description: SceneDescription) {
@@ -127,7 +146,7 @@ class DataStoreDescriptionHistoryRepository @Inject constructor(
     private fun decode(raw: String?): List<HistoryEntry> = try {
         if (raw.isNullOrBlank()) emptyList() else json.decodeFromString(serializer, raw)
     } catch (e: SerializationException) {
-        logger.warn(TAG, "History unreadable; ignoring", e)
+        errorReporter.reportStorage("history.decode", ErrorSeverity.ERROR, "history_discarded", throwable = e)
         emptyList()
     }
 
@@ -143,16 +162,17 @@ class DataStoreDescriptionHistoryRepository @Inject constructor(
     private fun toDomain(entry: HistoryEntry) = SceneDescription(
         requestId = entry.requestId,
         text = entry.text,
-        confidence = runCatching { Confidence.valueOf(entry.confidence) }.getOrDefault(Confidence.UNKNOWN),
+        confidence = Confidence.entries.firstOrNull { it.name == entry.confidence }
+            ?: Confidence.UNKNOWN.also { errorReporter.reportUnreadableValue("history.confidence", entry.confidence) },
         warnings = emptyList(),
         processingTimeMillis = null,
-        mode = runCatching { AnalysisMode.valueOf(entry.mode) }.getOrDefault(AnalysisMode.SCENE_DESCRIPTION),
+        mode = AnalysisMode.entries.firstOrNull { it.name == entry.mode }
+            ?: AnalysisMode.SCENE_DESCRIPTION.also { errorReporter.reportUnreadableValue("history.mode", entry.mode) },
         targetObject = entry.targetObject,
         createdAtMillis = entry.createdAtMillis,
     )
 
     private companion object {
-        const val TAG = "History"
         const val MAX_ENTRIES = 20
         val ENTRIES = stringPreferencesKey("entries")
     }
@@ -167,7 +187,7 @@ class FileCapturedImageArchive @Inject constructor(
     @param:ApplicationContext context: Context,
     private val settings: SettingsRepository,
     private val dispatchers: DispatcherProvider,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : CapturedImageArchive {
 
     private val directory = File(context.filesDir, "saved_images")
@@ -180,7 +200,7 @@ class FileCapturedImageArchive @Inject constructor(
                 val safeName = requestId.filter { it.isLetterOrDigit() || it == '-' }.take(64)
                 File(directory, "$safeName.jpg").writeBytes(image.jpegBytes)
             } catch (e: IOException) {
-                logger.warn(TAG, "Saving image failed", e)
+                errorReporter.reportStorage("imageArchive.save", ErrorSeverity.WARNING, "image_not_saved", throwable = e)
             }
         }
     }
@@ -190,8 +210,26 @@ class FileCapturedImageArchive @Inject constructor(
     }
 
     override suspend fun count(): Int = withContext(dispatchers.io) { directory.listFiles()?.size ?: 0 }
-
-    private companion object {
-        const val TAG = "ImageArchive"
-    }
 }
+
+/** Reports a local store that could not be read or written. */
+private fun ErrorReporter.reportStorage(
+    operation: String,
+    severity: ErrorSeverity,
+    outcome: String,
+    message: String? = null,
+    throwable: Throwable? = null,
+) = report(
+    ErrorReport(
+        domain = ErrorDomain.STORAGE,
+        operation = operation,
+        severity = severity,
+        outcome = outcome,
+        message = message,
+        throwable = throwable,
+    ),
+)
+
+/** Reports a stored enum name this build no longer knows; the default is used instead. */
+private fun ErrorReporter.reportUnreadableValue(operation: String, stored: String) =
+    reportStorage(operation, ErrorSeverity.WARNING, "default_used", message = "Unknown stored value: $stored")

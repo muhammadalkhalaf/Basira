@@ -4,7 +4,10 @@ import com.basira.app.data.image.ImageProcessor
 import com.basira.app.data.image.RawPhoto
 import com.basira.core.coroutines.ApplicationScope
 import com.basira.core.error.AppError
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
 import com.basira.core.retry.ExponentialBackoff
 import com.basira.domain.model.CameraPermissionStatus
@@ -81,6 +84,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  *    immediately so the glasses camera is never left running.
  * 4. An unexpected stop is reconnected with bounded exponential backoff with jitter. Permission,
  *    registration, and compatibility failures are surfaced and never retried automatically.
+ * 5. Every DAT failure is reported through [ErrorReporter], except the ones that only describe the
+ *    state of the glasses (disconnected, too hot, no permission), which leave a breadcrumb.
  *
  * Uses only stable (publishable) DAT APIs: the experimental standalone `Camera.photo`, Inputs,
  * Speech, and audio streaming capabilities are intentionally not used.
@@ -93,7 +98,7 @@ class DatGlassesRepository @Inject constructor(
     private val simulation: SimulatedGlassesController,
     private val imageProcessor: ImageProcessor,
     @param:ApplicationScope private val scope: CoroutineScope,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : GlassesRepository {
 
     private val _status = MutableStateFlow(
@@ -159,7 +164,14 @@ class DatGlassesRepository @Inject constructor(
                 }
             },
             { error, _ ->
-                logger.warn(TAG, "Permission check failed: ${error.description}")
+                reportDatError(
+                    operation = "dat.checkPermissionStatus",
+                    error = error,
+                    description = error.description,
+                    deviceCondition = error == PermissionError.META_AI_NOT_INSTALLED,
+                    outcome = "permission_unknown",
+                    severity = ErrorSeverity.WARNING,
+                )
                 if (error == PermissionError.META_AI_NOT_INSTALLED) {
                     _status.update { it.copy(metaAiInstalled = false) }
                 }
@@ -188,7 +200,7 @@ class DatGlassesRepository @Inject constructor(
                 lastSessionError?.let(DatErrorMapper::session) ?: AppError.GlassesDisconnected,
             )
             return withTimeoutOrNull(CAPTURE_TIMEOUT_MILLIS) { captureWithCamera(active) }
-                ?: AppResult.Failure(AppError.CaptureFailed)
+                ?: reportCaptureFailure("dat.capture", "timeout")
         } finally {
             captureMutex.unlock()
         }
@@ -203,7 +215,13 @@ class DatGlassesRepository @Inject constructor(
         scope.launch { Wearables.registrationState.collect(::onRegistrationState) }
         scope.launch {
             Wearables.registrationErrorStream.collect { error ->
-                logger.warn(TAG, "Registration error: ${error.description}")
+                reportDatError(
+                    operation = "dat.registration",
+                    error = error,
+                    description = error.description,
+                    deviceCondition = error == RegistrationError.META_AI_NOT_INSTALLED,
+                    outcome = "registration_not_completed",
+                )
                 if (error == RegistrationError.META_AI_NOT_INSTALLED) {
                     _status.update { it.copy(metaAiInstalled = false) }
                 }
@@ -299,13 +317,12 @@ class DatGlassesRepository @Inject constructor(
                 // Subscribe before start() so no transition is missed (DAT docs).
                 sessionJobs = listOf(
                     scope.launch { created.state.collect { onSessionState(created, it) } },
-                    scope.launch { created.errors.collect(::onSessionError) },
+                    scope.launch { created.errors.collect { onSessionError(it) } },
                 )
                 created.start()
             },
             { error, _ ->
-                logger.warn(TAG, "createSession failed: ${error.description}")
-                onSessionError(error)
+                onSessionError(error, operation = "dat.createSession")
                 onSessionEnded()
             },
         )
@@ -331,8 +348,14 @@ class DatGlassesRepository @Inject constructor(
         _status.update { it.copy(session = mapped, sessionError = null) }
     }
 
-    private fun onSessionError(error: DeviceSessionError) {
-        logger.warn(TAG, "Session error: ${error.description}")
+    private fun onSessionError(error: DeviceSessionError, operation: String = "dat.session") {
+        reportDatError(
+            operation = operation,
+            error = error,
+            description = error.description,
+            deviceCondition = DatErrorMapper.isDeviceCondition(error),
+            outcome = if (DatErrorMapper.isReconnectable(error)) "reconnect_scheduled" else "session_error_shown",
+        )
         if (DatErrorMapper.isNonBlocking(error)) return
         lastSessionError = error
         val mapped = DatErrorMapper.session(error)
@@ -359,7 +382,19 @@ class DatGlassesRepository @Inject constructor(
         reconnectAttempt += 1
         val wait = backoff.delayForAttempt(reconnectAttempt)
         if (wait == null) {
-            logger.warn(TAG, "Reconnect budget exhausted")
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.GLASSES,
+                    operation = "dat.reconnect",
+                    severity = ErrorSeverity.ERROR,
+                    outcome = "session_failed",
+                    reason = "budget_exhausted",
+                    attributes = mapOf(
+                        "dat.attempts" to (reconnectAttempt - 1).toString(),
+                        "dat.last_error" to (lastSessionError?.let(DatErrorMapper::reason) ?: "none"),
+                    ),
+                ),
+            )
             _status.update { it.copy(session = SessionStatus.FAILED) }
             return
         }
@@ -411,13 +446,16 @@ class DatGlassesRepository @Inject constructor(
             StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = STREAM_FRAME_RATE, compressVideo = true),
         )
         added.errorOrNull()?.let { error ->
-            logger.warn(TAG, "addCamera failed: ${error.description}")
+            reportDatError("dat.addCamera", error, error.description, DatErrorMapper.isDeviceCondition(error), "error_announced")
             return AppResult.Failure(DatErrorMapper.session(error))
         }
-        val camera = added.getOrNull() ?: return AppResult.Failure(AppError.CaptureFailed)
+        val camera = added.getOrNull() ?: return reportCaptureFailure("dat.addCamera", "no_camera")
         try {
             val stream = camera.stream
-            stream.start().errorOrNull()?.let { return AppResult.Failure(DatErrorMapper.stream(it)) }
+            stream.start().errorOrNull()?.let { error ->
+                reportDatError("dat.stream.start", error, error.toString(), DatErrorMapper.isDeviceCondition(error), "error_announced")
+                return AppResult.Failure(DatErrorMapper.stream(error))
+            }
             val outcome = withTimeoutOrNull(STREAM_START_TIMEOUT_MILLIS) {
                 merge(
                     stream.state.filter { it == StreamState.STREAMING || it == StreamState.CLOSED }
@@ -427,14 +465,24 @@ class DatGlassesRepository @Inject constructor(
                 ).first()
             }
             when (outcome) {
-                null -> return AppResult.Failure(AppError.CaptureFailed)
-                StreamOutcome.Closed -> return AppResult.Failure(AppError.GlassesDisconnected)
-                is StreamOutcome.Failed -> return AppResult.Failure(DatErrorMapper.stream(outcome.error))
+                null -> return reportCaptureFailure("dat.stream.awaitStreaming", "timeout")
+                StreamOutcome.Closed -> {
+                    errorReporter.breadcrumb("dat.stream.awaitStreaming CLOSED [device condition]")
+                    return AppResult.Failure(AppError.GlassesDisconnected)
+                }
+                is StreamOutcome.Failed -> {
+                    val error = outcome.error
+                    reportDatError("dat.stream", error, error.toString(), DatErrorMapper.isDeviceCondition(error), "error_announced")
+                    return AppResult.Failure(DatErrorMapper.stream(error))
+                }
                 StreamOutcome.Streaming -> Unit
             }
             val photo = stream.capturePhoto()
-            photo.errorOrNull()?.let { return AppResult.Failure(DatErrorMapper.capture(it)) }
-            val data = photo.getOrNull() ?: return AppResult.Failure(AppError.CaptureFailed)
+            photo.errorOrNull()?.let { error ->
+                reportDatError("dat.capturePhoto", error, error.toString(), DatErrorMapper.isDeviceCondition(error), "error_announced")
+                return AppResult.Failure(DatErrorMapper.capture(error))
+            }
+            val data = photo.getOrNull() ?: return reportCaptureFailure("dat.capturePhoto", "no_data")
             return imageProcessor.process(data.toRawPhoto())
         } catch (cancellation: CancellationException) {
             throw cancellation
@@ -445,9 +493,28 @@ class DatGlassesRepository @Inject constructor(
 
     private fun releaseCamera(owner: DeviceSession, camera: Camera) {
         // Stopping the camera cascades to its stream; removing it lets a later addCamera succeed.
-        runCatching { camera.stop() }.onFailure { logger.warn(TAG, "camera.stop failed", it) }
+        runCatching { camera.stop() }.onFailure {
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.GLASSES,
+                    operation = "dat.camera.stop",
+                    severity = ErrorSeverity.WARNING,
+                    outcome = "camera_removed_anyway",
+                    throwable = it,
+                ),
+            )
+        }
         owner.removeCamera().onFailure { error, _ ->
-            if (error != DeviceSessionError.CAPABILITY_NOT_FOUND) logger.warn(TAG, "removeCamera: ${error.description}")
+            if (error != DeviceSessionError.CAPABILITY_NOT_FOUND) {
+                reportDatError(
+                    operation = "dat.removeCamera",
+                    error = error,
+                    description = error.description,
+                    deviceCondition = DatErrorMapper.isDeviceCondition(error),
+                    outcome = "camera_left_attached",
+                    severity = ErrorSeverity.WARNING,
+                )
+            }
         }
     }
 
@@ -462,8 +529,51 @@ class DatGlassesRepository @Inject constructor(
 
     // endregion
 
+    // region Reporting
+
+    /** Reports a typed DAT error, or only leaves a breadcrumb when it describes the glasses' state. */
+    private fun reportDatError(
+        operation: String,
+        error: Any,
+        description: String,
+        deviceCondition: Boolean,
+        outcome: String,
+        severity: ErrorSeverity = ErrorSeverity.ERROR,
+    ) {
+        val reason = DatErrorMapper.reason(error)
+        if (deviceCondition) {
+            errorReporter.breadcrumb("$operation $reason [device condition]")
+            return
+        }
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.GLASSES,
+                operation = operation,
+                severity = severity,
+                outcome = outcome,
+                message = description,
+                reason = reason,
+            ),
+        )
+    }
+
+    /** Reports a capture step that failed without a DAT error and returns the failure the user hears. */
+    private fun reportCaptureFailure(operation: String, reason: String): AppResult.Failure {
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.GLASSES,
+                operation = operation,
+                severity = ErrorSeverity.ERROR,
+                outcome = "error_announced",
+                reason = reason,
+            ),
+        )
+        return AppResult.Failure(AppError.CaptureFailed)
+    }
+
+    // endregion
+
     private companion object {
-        const val TAG = "DatGlasses"
         const val STREAM_FRAME_RATE = 7
         const val SESSION_START_TIMEOUT_MILLIS = 20_000L
         const val STREAM_START_TIMEOUT_MILLIS = 15_000L

@@ -8,8 +8,8 @@ import com.meta.wearable.dat.camera.types.StreamError
 import com.meta.wearable.dat.core.types.DeviceSessionError
 
 /**
- * Translates typed DAT errors into framework-independent [AppError] values and decides which
- * session failures may be reconnected automatically.
+ * Translates typed DAT errors into framework-independent [AppError] values, decides which session
+ * failures may be reconnected automatically, and which ones are worth a crash report.
  */
 object DatErrorMapper {
 
@@ -63,6 +63,32 @@ object DatErrorMapper {
         -> true
         else -> false
     }
+
+    /**
+     * Returns `true` when [error] describes the state of the glasses rather than a defect: the link
+     * dropped, no glasses are around, the camera permission is missing, or the device is too hot or
+     * too low on battery. Like a dropped network connection, these are the normal life of a wearable
+     * and only leave a breadcrumb instead of a crash report.
+     */
+    fun isDeviceCondition(error: DeviceSessionError): Boolean = isNonBlocking(error) || isDeviceCondition(session(error))
+
+    /** Stream counterpart of [isDeviceCondition]. */
+    fun isDeviceCondition(error: StreamError): Boolean = isDeviceCondition(stream(error))
+
+    /** Capture counterpart of [isDeviceCondition]. */
+    fun isDeviceCondition(error: CaptureError): Boolean = capture(error).let { it == AppError.CaptureBusy || isDeviceCondition(it) }
+
+    private fun isDeviceCondition(error: AppError): Boolean =
+        error == AppError.GlassesUnavailable ||
+            error == AppError.GlassesDisconnected ||
+            error == AppError.CameraPermissionRequired ||
+            error is AppError.DeviceHealth
+
+    /**
+     * Returns a stable code for any DAT error, used as the report reason so two errors of the same
+     * operation are two issues: the enum name, or the class name of a sealed error.
+     */
+    fun reason(error: Any): String = (error as? Enum<*>)?.name ?: error::class.java.simpleName
 
     /**
      * Maps a stream error.

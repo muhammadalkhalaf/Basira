@@ -7,7 +7,10 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.basira.core.coroutines.ApplicationScope
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.model.SpeechAvailability
 import com.basira.domain.model.SpeechCompletion
 import com.basira.domain.model.SpeechOutputState
@@ -52,7 +55,7 @@ class AndroidSpeechOutput @Inject constructor(
     private val focus: AudioFocusController,
     settings: SettingsRepository,
     @param:ApplicationScope private val scope: CoroutineScope,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : SpeechOutput {
 
     private val _state = MutableStateFlow(SpeechOutputState())
@@ -81,9 +84,12 @@ class AndroidSpeechOutput @Inject constructor(
             complete(utteranceId, SpeechCompletion.INTERRUPTED)
 
         @Deprecated("Deprecated in Java")
-        override fun onError(utteranceId: String) = complete(utteranceId, SpeechCompletion.FAILED)
+        override fun onError(utteranceId: String) = onError(utteranceId, TextToSpeech.ERROR)
 
-        override fun onError(utteranceId: String, errorCode: Int) = complete(utteranceId, SpeechCompletion.FAILED)
+        override fun onError(utteranceId: String, errorCode: Int) {
+            reportTts("tts.speak", ErrorSeverity.WARNING, "utterance_not_spoken", reason = "error_$errorCode")
+            complete(utteranceId, SpeechCompletion.FAILED)
+        }
     }
 
     init {
@@ -110,6 +116,7 @@ class AndroidSpeechOutput @Inject constructor(
             focus.acquire()
             val mode = if (queueMode == SpeechQueueMode.FLUSH) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             if (engine.speak(text, mode, Bundle(), id) != TextToSpeech.SUCCESS) {
+                reportTts("tts.speak", ErrorSeverity.WARNING, "utterance_not_spoken", reason = "rejected")
                 complete(id, SpeechCompletion.FAILED)
             }
             continuation.invokeOnCancellation {
@@ -137,7 +144,7 @@ class AndroidSpeechOutput @Inject constructor(
         initTimeout = scope.launch {
             delay(INIT_TIMEOUT_MILLIS)
             if (_state.value.availability == SpeechAvailability.INITIALIZING) {
-                logger.warn(TAG, "TTS initialization timed out")
+                reportTts("tts.initialize", ErrorSeverity.CRITICAL, "speech_unavailable", reason = "timeout")
                 _state.update { it.copy(availability = SpeechAvailability.ENGINE_UNAVAILABLE) }
             }
         }
@@ -148,7 +155,7 @@ class AndroidSpeechOutput @Inject constructor(
         initTimeout?.cancel()
         val engine = tts
         if (status != TextToSpeech.SUCCESS || engine == null) {
-            logger.warn(TAG, "TTS engine unavailable (status $status)")
+            reportTts("tts.initialize", ErrorSeverity.CRITICAL, "speech_unavailable", reason = "status_$status")
             _state.update { it.copy(availability = SpeechAvailability.ENGINE_UNAVAILABLE) }
             return
         }
@@ -156,7 +163,7 @@ class AndroidSpeechOutput @Inject constructor(
         if (availability == TextToSpeech.LANG_MISSING_DATA || availability == TextToSpeech.LANG_NOT_SUPPORTED ||
             engine.setLanguage(ARABIC) < TextToSpeech.LANG_AVAILABLE
         ) {
-            logger.warn(TAG, "Arabic TTS voice unavailable ($availability)")
+            reportTts("tts.arabicVoice", ErrorSeverity.ERROR, "voice_install_offered", reason = "availability_$availability")
             _state.update { it.copy(availability = SpeechAvailability.ARABIC_MISSING) }
             return
         }
@@ -164,6 +171,20 @@ class AndroidSpeechOutput @Inject constructor(
         engine.setSpeechRate(speechRate)
         engine.setOnUtteranceProgressListener(listener)
         _state.update { it.copy(availability = SpeechAvailability.READY) }
+    }
+
+    /** Reports a TTS failure together with the engine it happened on, which is what decides the fix. */
+    private fun reportTts(operation: String, severity: ErrorSeverity, outcome: String, reason: String) {
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.AUDIO,
+                operation = operation,
+                severity = severity,
+                outcome = outcome,
+                reason = reason,
+                attributes = mapOf("tts.engine" to (tts?.defaultEngine ?: "none")),
+            ),
+        )
     }
 
     private fun onRouteLost() {
@@ -192,7 +213,6 @@ class AndroidSpeechOutput @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "Speech"
         const val INIT_TIMEOUT_MILLIS = 8_000L
         val ARABIC: Locale = Locale.forLanguageTag("ar")
     }

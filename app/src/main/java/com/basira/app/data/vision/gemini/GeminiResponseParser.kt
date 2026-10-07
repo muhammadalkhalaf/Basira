@@ -2,6 +2,10 @@ package com.basira.app.data.vision.gemini
 
 import com.basira.core.coroutines.BasiraConstants
 import com.basira.core.error.AppError
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
 import com.basira.domain.model.Confidence
 import javax.inject.Inject
@@ -29,11 +33,16 @@ data class GeminiAnswer(
  *
  * Rejected (never spoken): application-level errors, safety blocks, `incomplete` (truncated) or other
  * non-completed statuses, missing `model_output` text, non-JSON or schema-violating text, unknown
- * confidence values, and oversized fields.
+ * confidence values, and oversized fields. Every rejection is reported with the reason it was rejected
+ * for, because the HTTP call itself succeeded and nothing else would ever see it.
  *
  * @property errorMapper maps provider error codes.
+ * @property errorReporter where rejected answers are reported.
  */
-class GeminiResponseParser @Inject constructor(private val errorMapper: GeminiErrorMapper) {
+class GeminiResponseParser @Inject constructor(
+    private val errorMapper: GeminiErrorMapper,
+    private val errorReporter: ErrorReporter,
+) {
 
     private val answerJson = Json { ignoreUnknownKeys = true }
 
@@ -42,17 +51,20 @@ class GeminiResponseParser @Inject constructor(private val errorMapper: GeminiEr
      * @return the validated answer or a typed failure.
      */
     fun parse(response: GeminiInteractionResponse): AppResult<GeminiAnswer> {
-        response.error?.let { return AppResult.Failure(errorMapper.fromApiError(it)) }
+        response.error?.let { return reject(errorMapper.fromApiError(it), "api_error_${it.normalizedCode}", it.message) }
         val recorded = response.errors.orEmpty()
-        if (recorded.any { it.normalizedCode in GeminiErrorMapper.BLOCKED_CODES }) {
-            return AppResult.Failure(AppError.ContentBlocked)
+        recorded.firstOrNull { it.normalizedCode in GeminiErrorMapper.BLOCKED_CODES }?.let {
+            return reject(AppError.ContentBlocked, "blocked_${it.normalizedCode}", it.message)
         }
         when (response.status) {
             null, STATUS_COMPLETED -> Unit
-            STATUS_FAILED -> return AppResult.Failure(recorded.firstOrNull()?.let(errorMapper::fromApiError) ?: AppError.ServerError(500))
-            else -> return AppResult.Failure(AppError.InvalidServerResponse)
+            STATUS_FAILED -> {
+                val first = recorded.firstOrNull()
+                return reject(first?.let(errorMapper::fromApiError) ?: AppError.ServerError(500), "status_failed", first?.message)
+            }
+            else -> return reject(AppError.InvalidServerResponse, "status_${response.status}")
         }
-        val text = outputText(response) ?: return AppResult.Failure(AppError.InvalidServerResponse)
+        val text = outputText(response) ?: return reject(AppError.InvalidServerResponse, "no_output_text")
         return parseAnswer(text)
     }
 
@@ -73,25 +85,53 @@ class GeminiResponseParser @Inject constructor(private val errorMapper: GeminiEr
      */
     internal fun parseAnswer(raw: String): AppResult<GeminiAnswer> {
         val text = raw.trim().removeSurrounding("```json", "```").removeSurrounding("```", "```").trim()
-        if (!text.startsWith("{") || !text.endsWith("}")) return AppResult.Failure(AppError.InvalidServerResponse)
+        if (!text.startsWith("{") || !text.endsWith("}")) return reject(AppError.InvalidServerResponse, "not_a_json_object")
         val answer = try {
             answerJson.decodeFromString(GeminiStructuredAnswer.serializer(), text)
-        } catch (_: SerializationException) {
-            return AppResult.Failure(AppError.InvalidServerResponse)
-        } catch (_: IllegalArgumentException) {
-            return AppResult.Failure(AppError.InvalidServerResponse)
+        } catch (e: SerializationException) {
+            return reject(AppError.InvalidServerResponse, "schema_violation", throwable = e)
+        } catch (e: IllegalArgumentException) {
+            return reject(AppError.InvalidServerResponse, "schema_violation", throwable = e)
         }
         val confidence = when (answer.confidence.trim().uppercase()) {
             "HIGH" -> Confidence.HIGH
             "MEDIUM" -> Confidence.MEDIUM
             "LOW" -> Confidence.LOW
-            else -> return AppResult.Failure(AppError.InvalidServerResponse)
+            else -> return reject(AppError.InvalidServerResponse, "unknown_confidence", "confidence=${answer.confidence}")
         }
         val valid = answer.description.length <= BasiraConstants.MAX_DESCRIPTION_CHARS &&
             answer.warnings.size <= MAX_WARNINGS &&
             answer.warnings.all { it.length <= MAX_WARNING_CHARS }
-        if (!valid) return AppResult.Failure(AppError.InvalidServerResponse)
+        if (!valid) {
+            return reject(
+                AppError.InvalidServerResponse,
+                "oversized",
+                "description=${answer.description.length} chars, warnings=${answer.warnings.size}",
+            )
+        }
         return AppResult.Success(GeminiAnswer(answer.description.trim(), confidence, answer.warnings))
+    }
+
+    /** Reports why an answer was rejected and returns the failure the user hears. */
+    private fun reject(
+        error: AppError,
+        reason: String,
+        message: String? = null,
+        throwable: Throwable? = null,
+    ): AppResult.Failure {
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.VISION,
+                operation = "gemini.answer",
+                severity = if (error == AppError.ContentBlocked) ErrorSeverity.WARNING else ErrorSeverity.ERROR,
+                outcome = "error_announced",
+                message = message,
+                throwable = throwable,
+                reason = reason,
+                attributes = mapOf("app.error" to error.toString()),
+            ),
+        )
+        return AppResult.Failure(error)
     }
 
     private companion object {

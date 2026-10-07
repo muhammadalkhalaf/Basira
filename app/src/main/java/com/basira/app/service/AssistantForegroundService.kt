@@ -10,6 +10,10 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.basira.core.coroutines.ApplicationScope
 import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.assistant.AssistantEngine
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -40,6 +44,9 @@ class AssistantForegroundService : Service() {
     @Inject
     lateinit var logger: AppLogger
 
+    @Inject
+    lateinit var errorReporter: ErrorReporter
+
     private var observer: Job? = null
     private var mediaButtons: MediaButtonController? = null
 
@@ -57,7 +64,15 @@ class AssistantForegroundService : Service() {
             )
         } catch (e: RuntimeException) {
             // For example ForegroundServiceStartNotAllowedException when started from the background.
-            logger.error(TAG, "Could not enter the foreground", e)
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.SERVICE,
+                    operation = "service.startForeground",
+                    severity = ErrorSeverity.CRITICAL,
+                    outcome = "service_stopped",
+                    throwable = e,
+                ),
+            )
             stopSelf()
             return START_NOT_STICKY
         }
@@ -75,7 +90,15 @@ class AssistantForegroundService : Service() {
                     NotificationManagerCompat.from(service)
                         .notify(AssistantNotifications.NOTIFICATION_ID, AssistantNotifications.build(service, phase))
                 } catch (e: SecurityException) {
-                    logger.warn(TAG, "Notification update not permitted", e)
+                    errorReporter.report(
+                        ErrorReport(
+                            domain = ErrorDomain.SERVICE,
+                            operation = "notification.update",
+                            severity = ErrorSeverity.WARNING,
+                            outcome = "notification_stale",
+                            throwable = e,
+                        ),
+                    )
                 }
             }
         }
@@ -103,8 +126,6 @@ class AssistantForegroundService : Service() {
 
     /** Start and stop helpers. */
     companion object {
-        private const val TAG = "AssistantService"
-
         /**
          * Starts the service. Must be called while the app is in the foreground.
          *

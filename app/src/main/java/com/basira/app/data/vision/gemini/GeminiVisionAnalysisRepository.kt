@@ -5,11 +5,17 @@ import com.basira.core.coroutines.DispatcherProvider
 import com.basira.core.error.AppError
 import com.basira.core.error.RetryClassifier
 import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
 import com.basira.core.retry.ExponentialBackoff
 import com.basira.domain.model.VisionAnalysisRequest
 import com.basira.domain.model.VisionAnalysisResult
 import com.basira.domain.repository.VisionAnalysisRepository
+import java.io.IOException
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -35,6 +41,9 @@ import retrofit2.Response
  *   for several minutes.
  * - A missing key returns [AppError.ServiceNotConfigured] without any network call.
  * - The key, image data, prompts, and answers are never logged.
+ * - Every failed HTTP call is reported by the client's `ErrorReportingInterceptor`; this class reports
+ *   only what the interceptor cannot see: an answer that could not be decoded and an analysis that ran
+ *   past [totalBudgetMillis].
  *
  * @property api Retrofit service.
  * @property config key, model, and base URL.
@@ -45,6 +54,7 @@ import retrofit2.Response
  * @property base64Encoder encodes JPEG bytes (Android `Base64.NO_WRAP` in production).
  * @property dispatchers dispatchers for CPU-bound encoding.
  * @property logger log-safe logger.
+ * @property errorReporter where failures the interceptor cannot see are reported.
  * @property totalBudgetMillis upper bound for one analysis including all retries.
  */
 class GeminiVisionAnalysisRepository(
@@ -57,6 +67,7 @@ class GeminiVisionAnalysisRepository(
     private val base64Encoder: (ByteArray) -> String,
     private val dispatchers: DispatcherProvider,
     private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
     private val totalBudgetMillis: Long = DEFAULT_TOTAL_BUDGET_MILLIS,
 ) : VisionAnalysisRepository {
 
@@ -65,8 +76,26 @@ class GeminiVisionAnalysisRepository(
     override suspend fun analyze(request: VisionAnalysisRequest, onUploadComplete: () -> Unit): VisionAnalysisResult =
         inFlight.withLock {
             withTimeoutOrNull(totalBudgetMillis) { analyzeWithRetry(request, onUploadComplete) }
-                ?: VisionAnalysisResult.Failure(AppError.Timeout)
+                ?: reportBudgetExceeded(request)
         }
+
+    /**
+     * The cancelled call itself is only a breadcrumb (it is a cancellation), so the slow backend is
+     * reported here. A [TimeoutException] lets the reporter drop it when the phone was offline.
+     */
+    private fun reportBudgetExceeded(request: VisionAnalysisRequest): VisionAnalysisResult {
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.VISION,
+                operation = "gemini.analyze",
+                severity = ErrorSeverity.ERROR,
+                outcome = "timeout_announced",
+                throwable = TimeoutException("No answer within $totalBudgetMillis ms including retries"),
+                attributes = mapOf("vision.mode" to request.mode.name, "gemini.model" to config.model),
+            ),
+        )
+        return VisionAnalysisResult.Failure(AppError.Timeout)
+    }
 
     private suspend fun analyzeWithRetry(request: VisionAnalysisRequest, onUploadComplete: () -> Unit): VisionAnalysisResult {
         if (!config.isConfigured) return VisionAnalysisResult.Failure(AppError.ServiceNotConfigured)
@@ -118,7 +147,20 @@ class GeminiVisionAnalysisRepository(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Exception) {
-            logger.warn(TAG, "Gemini call failed", failure)
+            // An IOException was already reported by the client interceptor; anything else (an answer
+            // the converter could not decode, for example) happened after the interceptor saw a 2xx.
+            if (failure !is IOException) {
+                errorReporter.report(
+                    ErrorReport(
+                        domain = ErrorDomain.VISION,
+                        operation = "gemini.createInteraction",
+                        severity = ErrorSeverity.ERROR,
+                        outcome = "error_announced",
+                        throwable = failure,
+                        attributes = mapOf("gemini.model" to config.model),
+                    ),
+                )
+            }
             AttemptOutcome(AppResult.Failure(errorMapper.fromThrowable(failure)))
         }
 

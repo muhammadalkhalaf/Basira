@@ -8,7 +8,10 @@ import androidx.exifinterface.media.ExifInterface
 import com.basira.core.coroutines.BasiraConstants
 import com.basira.core.coroutines.DispatcherProvider
 import com.basira.core.error.AppError
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
 import com.basira.domain.model.CapturedImage
 import java.io.ByteArrayInputStream
@@ -46,7 +49,7 @@ sealed interface RawPhoto {
  */
 class ImageProcessor @Inject constructor(
     private val dispatchers: DispatcherProvider,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) {
 
     /**
@@ -60,7 +63,10 @@ class ImageProcessor @Inject constructor(
             val oriented = when (photo) {
                 is RawPhoto.Decoded -> photo.bitmap
                 is RawPhoto.Encoded -> decodeOriented(photo.bytes)
-            } ?: return@withContext AppResult.Failure(AppError.InvalidImage)
+            } ?: return@withContext fail(
+                "image.decode",
+                attributes = mapOf("image.bytes" to ((photo as? RawPhoto.Encoded)?.bytes?.size ?: 0).toString()),
+            )
             val scaled = scaleDown(oriented)
             val ownsOriented = photo is RawPhoto.Encoded
             try {
@@ -70,9 +76,27 @@ class ImageProcessor @Inject constructor(
                 if (ownsOriented) oriented.recycle()
             }
         } catch (oom: OutOfMemoryError) {
-            logger.error(TAG, "Out of memory while processing the photo")
-            AppResult.Failure(AppError.InvalidImage)
+            fail("image.process", throwable = oom)
         }
+    }
+
+    /** Reports a photo that could not be prepared and returns the failure the user hears. */
+    private fun fail(
+        operation: String,
+        throwable: Throwable? = null,
+        attributes: Map<String, String> = emptyMap(),
+    ): AppResult.Failure {
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.IMAGE,
+                operation = operation,
+                severity = ErrorSeverity.ERROR,
+                outcome = "error_announced",
+                throwable = throwable,
+                attributes = attributes,
+            ),
+        )
+        return AppResult.Failure(AppError.InvalidImage)
     }
 
     private fun decodeOriented(bytes: ByteArray): Bitmap? {
@@ -115,8 +139,7 @@ class ImageProcessor @Inject constructor(
                 return AppResult.Success(CapturedImage(bytes, bitmap.width, bitmap.height))
             }
         }
-        logger.warn(TAG, "Photo could not be compressed under the upload limit")
-        return AppResult.Failure(AppError.InvalidImage)
+        return fail("image.encode", attributes = mapOf("image.size" to "${bitmap.width}x${bitmap.height}"))
     }
 
     private fun readOrientation(bytes: ByteArray): Int = try {
@@ -124,12 +147,19 @@ class ImageProcessor @Inject constructor(
             ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         }
     } catch (e: IOException) {
-        logger.warn(TAG, "EXIF orientation unreadable", e)
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.IMAGE,
+                operation = "image.exifOrientation",
+                severity = ErrorSeverity.WARNING,
+                outcome = "orientation_assumed_normal",
+                throwable = e,
+            ),
+        )
         ExifInterface.ORIENTATION_NORMAL
     }
 
     private companion object {
-        const val TAG = "ImageProcessor"
         val JPEG_QUALITIES = listOf(BasiraConstants.JPEG_INITIAL_QUALITY, 72, 60, 48)
 
         /** Same EXIF orientation handling as the official CameraAccess sample. */

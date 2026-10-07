@@ -5,7 +5,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.model.SdkState
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.WearablesError
@@ -27,7 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 @Singleton
 class DatSdkInitializer @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) {
     private val _state = MutableStateFlow(SdkState.NOT_INITIALIZED)
 
@@ -52,7 +55,16 @@ class DatSdkInitializer @Inject constructor(
                 if (error == WearablesError.ALREADY_INITIALIZED) {
                     SdkState.READY
                 } else {
-                    logger.error(TAG, "DAT initialization failed: ${error.description}")
+                    errorReporter.report(
+                        ErrorReport(
+                            domain = ErrorDomain.GLASSES,
+                            operation = "dat.initialize",
+                            severity = ErrorSeverity.CRITICAL,
+                            outcome = "glasses_unavailable",
+                            message = error.description,
+                            reason = DatErrorMapper.reason(error),
+                        ),
+                    )
                     SdkState.FAILED
                 }
             },
@@ -65,8 +77,4 @@ class DatSdkInitializer @Inject constructor(
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
-
-    private companion object {
-        const val TAG = "DatSdk"
-    }
 }

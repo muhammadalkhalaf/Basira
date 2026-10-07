@@ -12,6 +12,10 @@ import androidx.core.content.ContextCompat
 import com.basira.core.coroutines.DispatcherProvider
 import com.basira.core.error.AppError
 import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
 import com.basira.domain.repository.VoiceCommandRecognizer
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -31,6 +35,7 @@ class AndroidVoiceCommandRecognizer @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val dispatchers: DispatcherProvider,
     private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : VoiceCommandRecognizer {
 
     override suspend fun listenOnce(): AppResult<String> = withContext<AppResult<String>>(dispatchers.main) {
@@ -55,7 +60,21 @@ class AndroidVoiceCommandRecognizer @Inject constructor(
 
                 override fun onError(error: Int) {
                     logger.info(TAG, "Recognition error $error")
-                    finish(AppResult.Failure(mapError(error)))
+                    val mapped = mapError(error)
+                    // No match and no network are the user's and the connection's; a recognizer that
+                    // cannot run at all is the one worth reporting.
+                    if (mapped == AppError.SpeechRecognitionUnavailable) {
+                        errorReporter.report(
+                            ErrorReport(
+                                domain = ErrorDomain.AUDIO,
+                                operation = "voice.recognize",
+                                severity = ErrorSeverity.ERROR,
+                                outcome = "error_announced",
+                                reason = "error_$error",
+                            ),
+                        )
+                    }
+                    finish(AppResult.Failure(mapped))
                 }
 
                 override fun onReadyForSpeech(params: Bundle?) = Unit

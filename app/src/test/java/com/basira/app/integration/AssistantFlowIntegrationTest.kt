@@ -1,12 +1,12 @@
 package com.basira.app.integration
 
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.app.data.glasses.FakeGlassesRepository
 import com.basira.app.data.vision.gemini.answerJson
 import com.basira.app.data.vision.gemini.geminiRepository
 import com.basira.app.data.vision.gemini.interactionBody
 import com.basira.app.testutil.ResourceSampleImageSource
 import com.basira.core.error.AppError
-import com.basira.core.logging.NoOpLogger
 import com.basira.domain.assistant.AnalysisRequestSpec
 import com.basira.domain.assistant.AnnouncementTextProvider
 import com.basira.domain.assistant.AssistantAction
@@ -147,7 +147,7 @@ class AssistantFlowIntegrationTest {
             findObject = FindObjectUseCase(analyze),
             identifyCurrency = IdentifyCurrencyUseCase(analyze),
             scope = scope,
-            logger = NoOpLogger,
+            errorReporter = NoOpErrorReporter,
         )
     }
 

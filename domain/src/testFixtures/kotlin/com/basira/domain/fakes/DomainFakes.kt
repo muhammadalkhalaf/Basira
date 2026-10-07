@@ -1,6 +1,8 @@
 package com.basira.domain.fakes
 
 import com.basira.core.error.AppError
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
 import com.basira.core.result.AppResult
 import com.basira.domain.assistant.Announcement
 import com.basira.domain.assistant.Announcer
@@ -226,4 +228,12 @@ class FakePhoneLocator : PhoneLocator {
     override fun stop() {
         ringing.value = false
     }
+}
+
+/** Error reporter that records every report and breadcrumb instead of sending it. */
+class RecordingErrorReporter : ErrorReporter {
+    val reports = mutableListOf<ErrorReport>()
+    val breadcrumbs = mutableListOf<String>()
+    override fun report(report: ErrorReport) { synchronized(this) { reports += report } }
+    override fun breadcrumb(message: String) { synchronized(this) { breadcrumbs += message } }
 }

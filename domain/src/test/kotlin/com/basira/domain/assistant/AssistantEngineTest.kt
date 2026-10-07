@@ -1,8 +1,8 @@
 package com.basira.domain.assistant
 
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.core.error.AppError
 import com.basira.core.error.UpdateTarget
-import com.basira.core.logging.NoOpLogger
 import com.basira.core.result.AppResult
 import com.basira.domain.fakes.FakeConnectivityObserver
 import com.basira.domain.fakes.FakeGlassesRepositoryForTest
@@ -109,7 +109,7 @@ class AssistantEngineTest {
             findObject = FindObjectUseCase(analyze),
             identifyCurrency = IdentifyCurrencyUseCase(analyze),
             scope = scope,
-            logger = NoOpLogger,
+            errorReporter = NoOpErrorReporter,
         ).also { it.start() }
     }
 

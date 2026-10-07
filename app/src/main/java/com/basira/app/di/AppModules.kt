@@ -6,6 +6,8 @@ import com.basira.app.core.BuildModes
 import com.basira.app.core.DefaultDispatcherProvider
 import com.basira.app.core.SystemClock
 import com.basira.app.core.UuidRequestIdGenerator
+import com.basira.app.controllers.reporting.CrashlyticsErrorReporter
+import com.basira.app.controllers.reporting.ErrorReportingInterceptor
 import com.basira.app.data.connectivity.AndroidConnectivityObserver
 import com.basira.app.data.glasses.AssetSampleImageSource
 import com.basira.app.data.glasses.DatGlassesRepository
@@ -34,6 +36,7 @@ import com.basira.app.data.voice.AndroidVoiceCommandRecognizer
 import com.basira.core.coroutines.ApplicationScope
 import com.basira.core.coroutines.DispatcherProvider
 import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorReporter
 import com.basira.core.retry.ExponentialBackoff
 import com.basira.domain.assistant.AnnouncementTextProvider
 import com.basira.domain.assistant.Announcer
@@ -94,6 +97,7 @@ object AppModule {
 abstract class BindingsModule {
     @Binds abstract fun dispatchers(impl: DefaultDispatcherProvider): DispatcherProvider
     @Binds abstract fun logger(impl: AndroidLogger): AppLogger
+    @Binds abstract fun errorReporter(impl: CrashlyticsErrorReporter): ErrorReporter
     @Binds abstract fun clock(impl: SystemClock): Clock
     @Binds abstract fun requestIds(impl: UuidRequestIdGenerator): RequestIdGenerator
     @Binds abstract fun speech(impl: AndroidSpeechOutput): SpeechOutput
@@ -152,17 +156,19 @@ object NetworkModule {
     )
 
     /**
-     * HTTP client with explicit time budgets. Debug builds log only BASIC request lines with the
-     * key header redacted (never BODY: bodies contain images); release builds log nothing.
+     * HTTP client with explicit time budgets. Every failed call is reported to Crashlytics by
+     * [ErrorReportingInterceptor]. Debug builds log only BASIC request lines with the key header
+     * redacted (never BODY: bodies contain images); release builds log nothing.
      */
     @Provides
     @Singleton
-    fun provideOkHttp(): OkHttpClient = OkHttpClient.Builder()
+    fun provideOkHttp(errorReporter: ErrorReporter): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .writeTimeout(20, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
         .callTimeout(60, TimeUnit.SECONDS)
         .retryOnConnectionFailure(false)
+        .addInterceptor(ErrorReportingInterceptor("gemini", errorReporter))
         .addInterceptor(UploadCompletionInterceptor())
         .apply {
             if (BuildConfig.DEBUG) {
@@ -178,7 +184,7 @@ object NetworkModule {
 
     /** Error classifier. */
     @Provides
-    fun provideErrorMapper(json: Json): GeminiErrorMapper = GeminiErrorMapper(json)
+    fun provideErrorMapper(json: Json, errorReporter: ErrorReporter): GeminiErrorMapper = GeminiErrorMapper(json, errorReporter)
 
     /** Vision repository: offline fake, explicit misconfiguration, or Gemini directly. */
     @Provides
@@ -192,6 +198,7 @@ object NetworkModule {
         errorMapper: GeminiErrorMapper,
         dispatchers: DispatcherProvider,
         logger: AppLogger,
+        errorReporter: ErrorReporter,
     ): VisionAnalysisRepository {
         if (BuildModes.isFakeVision) return FakeVisionAnalysisRepository()
         if (!config.isConfigured) return MisconfiguredVisionAnalysisRepository()
@@ -210,6 +217,7 @@ object NetworkModule {
             base64Encoder = { bytes -> Base64.encodeToString(bytes, Base64.NO_WRAP) },
             dispatchers = dispatchers,
             logger = logger,
+            errorReporter = errorReporter,
         )
     }
 }

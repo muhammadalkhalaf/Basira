@@ -31,7 +31,10 @@ import com.basira.app.presentation.setup.ActivityEffect
 import com.basira.app.presentation.setup.ActivityEffectBus
 import com.basira.app.presentation.setup.EnvironmentRefresher
 import com.basira.app.presentation.theme.BasiraTheme
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.assistant.AssistantAction
 import com.basira.domain.assistant.AssistantEngine
 import com.basira.domain.repository.GlassesRepository
@@ -61,7 +64,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var environment: EnvironmentRefresher
 
-    @Inject lateinit var logger: AppLogger
+    @Inject lateinit var errorReporter: ErrorReporter
 
     private lateinit var cameraPermissionLauncher: ActivityResultLauncher<Unit>
     private lateinit var bluetoothLauncher: ActivityResultLauncher<String>
@@ -156,7 +159,16 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
         true
     } catch (e: ActivityNotFoundException) {
-        logger.warn(TAG, "No activity for ${intent.action}", e)
+        errorReporter.report(
+            ErrorReport(
+                domain = ErrorDomain.UI,
+                operation = "activity.start",
+                severity = ErrorSeverity.WARNING,
+                outcome = "fallback_tried",
+                throwable = e,
+                reason = intent.action,
+            ),
+        )
         false
     }
 
@@ -185,7 +197,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val TAG = "MainActivity"
         const val TTS_SETTINGS_ACTION = "com.android.settings.TTS_SETTINGS"
     }
 }

@@ -1,6 +1,10 @@
 package com.basira.app.data.vision.gemini
 
 import com.basira.core.error.AppError
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ConnectException
@@ -22,10 +26,12 @@ import kotlinx.serialization.json.Json
  * Provider messages are never surfaced; only the typed error leaves this class.
  *
  * @property json parser for the error envelope.
+ * @property errorReporter where an unreadable error envelope or `Retry-After` value is reported.
  * @property nowProvider clock used to resolve HTTP-date `Retry-After` values.
  */
 class GeminiErrorMapper(
     private val json: Json,
+    private val errorReporter: ErrorReporter,
     private val nowProvider: () -> ZonedDateTime = { ZonedDateTime.now() },
 ) {
 
@@ -114,7 +120,17 @@ class GeminiErrorMapper(
         return try {
             val date = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME)
             Duration.between(nowProvider(), date).toMillis().coerceAtLeast(0)
-        } catch (_: DateTimeParseException) {
+        } catch (e: DateTimeParseException) {
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.VISION,
+                    operation = "gemini.retryAfter.parse",
+                    severity = ErrorSeverity.WARNING,
+                    outcome = "backoff_used",
+                    throwable = e,
+                    attributes = mapOf("http.retry_after" to value),
+                ),
+            )
             null
         }
     }
@@ -123,9 +139,17 @@ class GeminiErrorMapper(
         if (body.isNullOrBlank()) return null
         return try {
             json.decodeFromString(GeminiErrorEnvelope.serializer(), body).error
-        } catch (_: SerializationException) {
-            null
-        } catch (_: IllegalArgumentException) {
+        } catch (e: IllegalArgumentException) {
+            // SerializationException is an IllegalArgumentException. The HTTP status is still mapped.
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.VISION,
+                    operation = "gemini.errorEnvelope.decode",
+                    severity = ErrorSeverity.WARNING,
+                    outcome = "status_code_used",
+                    throwable = e,
+                ),
+            )
             null
         }
     }

@@ -1,7 +1,10 @@
 package com.basira.app.data.vision.gemini
 
+import com.basira.app.controllers.reporting.ErrorReportingInterceptor
 import com.basira.app.testutil.RecordingLogger
 import com.basira.core.coroutines.DispatcherProvider
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.core.retry.ExponentialBackoff
 import java.util.Base64
 import java.util.concurrent.TimeUnit
@@ -39,10 +42,12 @@ fun geminiRepository(
     readTimeoutMillis: Long = 5_000,
     logger: RecordingLogger = RecordingLogger(),
     totalBudgetMillis: Long = 30_000,
+    errorReporter: ErrorReporter = NoOpErrorReporter,
 ): GeminiVisionAnalysisRepository {
     val client = OkHttpClient.Builder()
         .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
         .retryOnConnectionFailure(false)
+        .addInterceptor(ErrorReportingInterceptor("gemini", errorReporter))
         .addInterceptor(UploadCompletionInterceptor())
         .build()
     val config = GeminiConfig(apiKey = apiKey, model = "gemini-3.5-flash-lite", baseUrl = server.url("/").toString())
@@ -51,17 +56,18 @@ fun geminiRepository(
         .client(client)
         .addConverterFactory(testJson.asConverterFactory("application/json".toMediaType()))
         .build()
-    val mapper = GeminiErrorMapper(testJson)
+    val mapper = GeminiErrorMapper(testJson, errorReporter)
     return GeminiVisionAnalysisRepository(
         api = retrofit.create(GeminiApiService::class.java),
         config = config,
         prompts = GeminiPromptBuilder(),
-        parser = GeminiResponseParser(mapper),
+        parser = GeminiResponseParser(mapper, errorReporter),
         errorMapper = mapper,
         backoff = ExponentialBackoff(baseDelayMillis = 1, maxDelayMillis = 2, maxAttempts = 2, jitter = false),
         base64Encoder = { Base64.getEncoder().encodeToString(it) },
         dispatchers = inlineDispatchers,
         logger = logger,
+        errorReporter = errorReporter,
         totalBudgetMillis = totalBudgetMillis,
     )
 }

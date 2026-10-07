@@ -2,7 +2,10 @@ package com.basira.domain.assistant
 
 import com.basira.core.coroutines.ApplicationScope
 import com.basira.core.error.AppError
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.core.result.AppResult
 import com.basira.domain.model.AnalysisMode
 import com.basira.domain.model.AudioRoute
@@ -160,7 +163,7 @@ class AssistantEngine @Inject constructor(
     private val findObject: FindObjectUseCase,
     private val identifyCurrency: IdentifyCurrencyUseCase,
     @param:ApplicationScope private val scope: CoroutineScope,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) {
 
     /** Engine-owned mutable facts; everything else is derived from observed inputs. */
@@ -394,7 +397,16 @@ class AssistantEngine @Inject constructor(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (unexpected: Exception) {
-            logger.error(TAG, "Analysis failed unexpectedly: ${unexpected::class.simpleName}")
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.ASSISTANT,
+                    operation = "assistant.analysis",
+                    severity = ErrorSeverity.ERROR,
+                    outcome = "error_announced",
+                    throwable = unexpected,
+                    attributes = mapOf("analysis.mode" to spec.mode.name),
+                ),
+            )
             reportFailure(id, AppError.Unexpected())
         } finally {
             captureAnnouncement.cancel()
@@ -450,7 +462,15 @@ class AssistantEngine @Inject constructor(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (storageFailure: Exception) {
-            logger.warn(TAG, "History write failed: ${storageFailure::class.simpleName}")
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.STORAGE,
+                    operation = "history.add",
+                    severity = ErrorSeverity.WARNING,
+                    outcome = "description_spoken_not_saved",
+                    throwable = storageFailure,
+                ),
+            )
         }
         feedback.play(FeedbackCue.SUCCESS)
         speakDescription(id, description, repeated = false)
@@ -593,7 +613,6 @@ class AssistantEngine @Inject constructor(
     // endregion
 
     private companion object {
-        const val TAG = "AssistantEngine"
         const val STATUS_DEBOUNCE_MILLIS = 1_200L
     }
 }

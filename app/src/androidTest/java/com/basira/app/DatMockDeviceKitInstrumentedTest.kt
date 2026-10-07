@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.basira.app.core.AndroidLogger
 import com.basira.app.core.DefaultDispatcherProvider
 import com.basira.app.data.glasses.DatGlassesRepository
 import com.basira.app.data.glasses.DatSdkInitializer
@@ -12,6 +11,7 @@ import com.basira.app.data.glasses.MetaAiAppDetector
 import com.basira.app.data.glasses.SimulatedGlassesController
 import com.basira.app.data.image.ImageProcessor
 import com.basira.app.mock.MockVideoFeed
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.core.result.AppResult
 import com.basira.domain.model.CameraPermissionStatus
 import com.basira.domain.model.LinkStatus
@@ -70,8 +70,7 @@ class DatMockDeviceKitInstrumentedTest {
         glasses.services.camera.setCapturedImage(assetUri("02_obstacle_stairs.jpg"))
 
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val logger = AndroidLogger()
-        val sdk = DatSdkInitializer(context, logger).also { it.initializeIfPermitted() }
+        val sdk = DatSdkInitializer(context, NoOpErrorReporter).also { it.initializeIfPermitted() }
         repository = DatGlassesRepository(
             sdk = sdk,
             metaAi = MetaAiAppDetector(context),
@@ -79,9 +78,9 @@ class DatMockDeviceKitInstrumentedTest {
                 override val isActive = true
                 override fun prepare() = Unit
             },
-            imageProcessor = ImageProcessor(DefaultDispatcherProvider(), logger),
+            imageProcessor = ImageProcessor(DefaultDispatcherProvider(), NoOpErrorReporter),
             scope = scope,
-            logger = logger,
+            errorReporter = NoOpErrorReporter,
         )
     }
 

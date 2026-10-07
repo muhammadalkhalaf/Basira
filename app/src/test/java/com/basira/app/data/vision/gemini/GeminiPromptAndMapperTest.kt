@@ -1,6 +1,7 @@
 package com.basira.app.data.vision.gemini
 
 import com.basira.core.error.AppError
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.domain.model.AnalysisMode
 import com.basira.domain.model.Verbosity
 import java.io.IOException
@@ -54,7 +55,7 @@ class GeminiPromptBuilderTest {
 class GeminiErrorMapperTest {
 
     private val now = ZonedDateTime.of(2026, 10, 7, 12, 0, 0, 0, ZoneOffset.UTC)
-    private val mapper = GeminiErrorMapper(testJson) { now }
+    private val mapper = GeminiErrorMapper(testJson, NoOpErrorReporter) { now }
 
     @Test
     fun `legacy numeric error codes fall back to the status`() {

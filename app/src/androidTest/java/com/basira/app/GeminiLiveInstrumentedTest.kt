@@ -15,6 +15,7 @@ import com.basira.app.data.vision.gemini.GeminiPromptBuilder
 import com.basira.app.data.vision.gemini.GeminiResponseParser
 import com.basira.app.data.vision.gemini.GeminiVisionAnalysisRepository
 import com.basira.app.data.vision.gemini.UploadCompletionInterceptor
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.core.result.AppResult
 import com.basira.core.retry.ExponentialBackoff
 import com.basira.domain.model.AnalysisMode
@@ -60,23 +61,24 @@ class GeminiLiveInstrumentedTest {
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        val mapper = GeminiErrorMapper(json)
+        val mapper = GeminiErrorMapper(json, NoOpErrorReporter)
         return GeminiVisionAnalysisRepository(
             api = retrofit.create(GeminiApiService::class.java),
             config = config,
             prompts = GeminiPromptBuilder(),
-            parser = GeminiResponseParser(mapper),
+            parser = GeminiResponseParser(mapper, NoOpErrorReporter),
             errorMapper = mapper,
             backoff = ExponentialBackoff(800, 6_000, maxAttempts = 2),
             base64Encoder = { Base64.encodeToString(it, Base64.NO_WRAP) },
             dispatchers = DefaultDispatcherProvider(),
             logger = AndroidLogger(),
+            errorReporter = NoOpErrorReporter,
         )
     }
 
     private fun analyze(asset: String, mode: AnalysisMode): VisionAnalysisResult = runBlocking {
         val bytes = InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { it.readBytes() }
-        val prepared = ImageProcessor(DefaultDispatcherProvider(), AndroidLogger()).process(RawPhoto.Encoded(bytes))
+        val prepared = ImageProcessor(DefaultDispatcherProvider(), NoOpErrorReporter).process(RawPhoto.Encoded(bytes))
         val image = (prepared as AppResult.Success).value
         var uploaded = false
         val started = System.currentTimeMillis()

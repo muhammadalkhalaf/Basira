@@ -7,7 +7,7 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.basira.core.coroutines.BasiraConstants
 import com.basira.core.coroutines.DispatcherProvider
-import com.basira.core.logging.NoOpLogger
+import com.basira.core.reporting.NoOpErrorReporter
 import com.basira.core.result.AppResult
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -30,7 +30,7 @@ class ImageProcessorTest {
         override val io = Dispatchers.Unconfined
         override val default = Dispatchers.Unconfined
     }
-    private val processor = ImageProcessor(dispatchers, NoOpLogger)
+    private val processor = ImageProcessor(dispatchers, NoOpErrorReporter)
 
     private fun jpeg(width: Int, height: Int): ByteArray {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.DKGRAY) }

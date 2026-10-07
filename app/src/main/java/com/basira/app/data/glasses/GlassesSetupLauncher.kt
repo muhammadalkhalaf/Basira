@@ -4,7 +4,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContract
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.registration.RegistrationRequest
 import com.meta.wearable.dat.core.types.Permission
@@ -70,7 +73,7 @@ interface GlassesSetupLauncher {
 /** [GlassesSetupLauncher] using the documented DAT APIs. */
 class DatGlassesSetupLauncher @Inject constructor(
     private val sdk: DatSdkInitializer,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : GlassesSetupLauncher {
 
     /** Wraps `Wearables.RequestPermissionContract` so callers receive a plain boolean. */
@@ -100,7 +103,7 @@ class DatGlassesSetupLauncher @Inject constructor(
         Wearables.openFirmwareUpdate(activity).fold(
             { true },
             { error, _ ->
-                logger.warn(TAG, "openFirmwareUpdate: ${error.description}")
+                errorReporter.reportSetupError("dat.openFirmwareUpdate", error, error.description, "meta_ai_opened_instead")
                 false
             },
         )
@@ -109,18 +112,18 @@ class DatGlassesSetupLauncher @Inject constructor(
         Wearables.openDATGlassesAppUpdate(activity).fold(
             { true },
             { error, _ ->
-                logger.warn(TAG, "openDATGlassesAppUpdate: ${error.description}")
+                errorReporter.reportSetupError("dat.openGlassesAppUpdate", error, error.description, "meta_ai_opened_instead")
                 false
             },
         )
 
     override fun handleIntent(intent: Intent, onRegistrationRequest: (PendingRegistrationRequest) -> Unit): Boolean {
         if (sdk.state.value != com.basira.domain.model.SdkState.READY) return false
-        return Wearables.handleIntent(intent) { request -> onRegistrationRequest(DatPendingRequest(request, logger)) }
+        return Wearables.handleIntent(intent) { request -> onRegistrationRequest(DatPendingRequest(request, errorReporter)) }
             .fold(
                 { handled -> handled },
                 { error, _ ->
-                    logger.warn(TAG, "handleIntent: ${error.description}")
+                    errorReporter.reportSetupError("dat.handleIntent", error, error.description, "intent_ignored")
                     false
                 },
             )
@@ -128,25 +131,33 @@ class DatGlassesSetupLauncher @Inject constructor(
 
     private class DatPendingRequest(
         private val request: RegistrationRequest,
-        private val logger: AppLogger,
+        private val errorReporter: ErrorReporter,
     ) : PendingRegistrationRequest {
         override fun accept(activity: Activity) {
             request.continueRegistration(activity).onFailure { error, _ ->
-                logger.warn(TAG, "continueRegistration: ${error.description}")
+                errorReporter.reportSetupError("dat.continueRegistration", error, error.description, "registration_not_continued")
             }
         }
 
         override fun decline() {
             request.cancelRegistration().onFailure { error, _ ->
-                logger.warn(TAG, "cancelRegistration: ${error.description}")
+                errorReporter.reportSetupError("dat.cancelRegistration", error, error.description, "registration_left_pending")
             }
         }
     }
-
-    private companion object {
-        const val TAG = "DatSetup"
-    }
 }
+
+/** Reports a setup step Meta AI refused; the user stays on the setup screen and can try again. */
+private fun ErrorReporter.reportSetupError(operation: String, error: Any, description: String, outcome: String) = report(
+    ErrorReport(
+        domain = ErrorDomain.GLASSES,
+        operation = operation,
+        severity = ErrorSeverity.WARNING,
+        outcome = outcome,
+        message = description,
+        reason = DatErrorMapper.reason(error),
+    ),
+)
 
 /**
  * [GlassesSetupLauncher] for the bundled-sample simulation: every flow succeeds immediately so the

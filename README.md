@@ -4,8 +4,8 @@ Basira is a native Android app that helps blind and low-vision Arabic speakers u
 surroundings with Ray-Ban Meta glasses. On request it captures one still photo from the glasses camera
 through the Meta Wearables Device Access Toolkit (DAT), sends it **directly from the phone to Google's
 Gemini API**, and speaks a short Arabic description with Android Text-to-Speech, preferably through
-the glasses speakers. No application backend is used. Release builds report crashes and basic usage
-to Firebase (Crashlytics and Analytics); images and descriptions are never sent there.
+the glasses speakers. No application backend is used. Release builds report crashes, non-fatal
+errors, and basic usage to Firebase (Crashlytics and Analytics); images are never sent there.
 
 > **Experimental, private build only.** The Gemini API key is compiled into the APK and can be
 > extracted by anyone who has the APK. This design is unsuitable for public or production
@@ -211,10 +211,16 @@ Firebase project `basira-75f4b`, Android app `com.basira.app`.
 - Collection is **on in release and off in debug**, so development sessions do not pollute tester
   data. To test Firebase from a debug build:
   `./gradlew :app:installDebug -Pbasira.firebase.debugCollection=true`.
-- Only the SDKs' automatic data is collected (Analytics: `first_open`, `session_start`,
-  `screen_view`, app/OS version; Crashlytics: crash stack traces and device state). The app logs no
-  custom events, keys, or messages. Never pass images, prompts, recognized text, descriptions, object
-  names, or the API key to Firebase.
+- Analytics collects only the SDK's automatic data (`first_open`, `session_start`, `screen_view`,
+  app/OS version); the app logs no custom events.
+- Crashlytics receives crashes and **non-fatal reports**. Every component reports a caught failure
+  through `ErrorReporter` (`core/.../reporting` for the model, `app/.../controllers/reporting` for
+  Crashlytics) with an `ErrorDomain`, an `ErrorSeverity`, and an outcome (what the app did about it).
+  `ErrorReportingInterceptor` reports every failed Gemini call from the OkHttp client. Each report is
+  recorded as a `ReportedFailure` whose top frame names the operation, so one endpoint (or one DAT/TTS
+  operation) is one Crashlytics issue. Connection failures and glasses-state conditions only leave a
+  breadcrumb, and a repeated failure is sent at most once a minute (with `error.suppressed_before`).
+  Nothing is sanitised; see [SECURITY.md](SECURITY.md) for what a report may contain.
 - Privacy: the advertising ID, SSAID, and Privacy Sandbox (AdServices) permissions are disabled or
   removed, and ad-related consent signals default to denied.
 - `assembleRelease` uploads the R8 mapping file to Crashlytics (`uploadCrashlyticsMappingFileRelease`)
@@ -318,8 +324,8 @@ See [docs/MANUAL_TEST_PLAN.md](docs/MANUAL_TEST_PLAN.md) for TalkBack and hardwa
 See [SECURITY.md](SECURITY.md). In short: the API key is extractable from the APK (accepted for this
 private test build only); images go directly from the phone to Google's Gemini API and are not
 intentionally stored by the app; no image storage by default (explicit opt-in), optional text history
-off by default, delete-local-data action, Firebase Analytics/Crashlytics in release only (no images or
-descriptions, no advertising ID), redacted logs, no backup of app data.
+off by default, delete-local-data action, Firebase Analytics/Crashlytics in release only (no images, no
+advertising ID; unsanitised non-fatal reports), redacted logs, no backup of app data.
 
 ## Safety
 

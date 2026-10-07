@@ -5,7 +5,10 @@ import android.media.AudioAttributes
 import android.media.Ringtone
 import android.media.RingtoneManager
 import com.basira.core.coroutines.ApplicationScope
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.repository.PhoneLocator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -26,7 +29,7 @@ import kotlinx.coroutines.launch
 class AndroidPhoneLocator @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:ApplicationScope private val scope: CoroutineScope,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : PhoneLocator {
 
     private val _isRinging = MutableStateFlow(false)
@@ -40,7 +43,15 @@ class AndroidPhoneLocator @Inject constructor(
         val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         val tone = RingtoneManager.getRingtone(context, uri) ?: run {
-            logger.warn(TAG, "No ringtone available")
+            errorReporter.report(
+                ErrorReport(
+                    domain = ErrorDomain.AUDIO,
+                    operation = "phoneLocator.ringtone",
+                    severity = ErrorSeverity.ERROR,
+                    outcome = "phone_not_ringing",
+                    message = "No ringtone for $uri",
+                ),
+            )
             return
         }
         tone.audioAttributes = AudioAttributes.Builder()
@@ -66,7 +77,6 @@ class AndroidPhoneLocator @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "PhoneLocator"
         const val MAX_DURATION_MILLIS = 30_000L
     }
 }

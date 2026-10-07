@@ -7,7 +7,10 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.basira.domain.model.FeedbackCue
 import com.basira.domain.repository.FeedbackPlayer
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,7 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class AndroidFeedbackPlayer @Inject constructor(
     @param:ApplicationContext context: Context,
-    private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : FeedbackPlayer {
 
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -34,7 +37,7 @@ class AndroidFeedbackPlayer @Inject constructor(
     private val toneGenerator: ToneGenerator? = try {
         ToneGenerator(AudioManager.STREAM_MUSIC, TONE_VOLUME)
     } catch (e: RuntimeException) {
-        logger.warn(TAG, "Tone generator unavailable", e)
+        reportToneFailure("tone.create", e)
         null
     }
 
@@ -43,10 +46,21 @@ class AndroidFeedbackPlayer @Inject constructor(
         try {
             toneGenerator?.startTone(tone, durationMillis)
         } catch (e: RuntimeException) {
-            logger.warn(TAG, "Tone failed", e)
+            reportToneFailure("tone.play", e)
         }
         vibrate(PATTERNS.getValue(cue))
     }
+
+    /** The cue still vibrates, so the user is not left without feedback. */
+    private fun reportToneFailure(operation: String, failure: RuntimeException) = errorReporter.report(
+        ErrorReport(
+            domain = ErrorDomain.AUDIO,
+            operation = operation,
+            severity = ErrorSeverity.WARNING,
+            outcome = "vibration_only",
+            throwable = failure,
+        ),
+    )
 
     private fun vibrate(pattern: LongArray) {
         val device = vibrator ?: return
@@ -55,7 +69,6 @@ class AndroidFeedbackPlayer @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "Feedback"
         const val TONE_VOLUME = 70
 
         val TONES: Map<FeedbackCue, Pair<Int, Int>> = mapOf(

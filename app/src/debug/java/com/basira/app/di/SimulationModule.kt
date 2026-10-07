@@ -6,6 +6,10 @@ import com.basira.app.core.BuildModes
 import com.basira.app.data.glasses.SimulatedGlassesController
 import com.basira.app.mock.MockVideoFeed
 import com.basira.core.logging.AppLogger
+import com.basira.core.reporting.ErrorDomain
+import com.basira.core.reporting.ErrorReport
+import com.basira.core.reporting.ErrorReporter
+import com.basira.core.reporting.ErrorSeverity
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
 import com.meta.wearable.dat.mockdevice.api.GlassesModel
 import com.meta.wearable.dat.mockdevice.api.MockDeviceKitConfig
@@ -32,6 +36,7 @@ import javax.inject.Singleton
 class MockDeviceKitController @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val logger: AppLogger,
+    private val errorReporter: ErrorReporter,
 ) : SimulatedGlassesController {
 
     override val isActive: Boolean = BuildModes.glassesMode == "mockdevicekit"
@@ -54,7 +59,7 @@ class MockDeviceKitController @Inject constructor(
                 feed?.let { glasses.services.camera.setCameraFeed(it) }
                 logger.info(TAG, "MockDeviceKit glasses paired")
             },
-            { error, _ -> logger.warn(TAG, "MockDeviceKit pairing failed: ${error.description}") },
+            { error, _ -> report("mockDeviceKit.pairGlasses", message = error.description) },
         )
     }
 
@@ -63,19 +68,38 @@ class MockDeviceKitController @Inject constructor(
         target.parentFile?.mkdirs()
         context.assets.open(path).use { input -> target.outputStream().use { input.copyTo(it) } }
         Uri.fromFile(target)
-    } catch (_: IOException) {
+    } catch (e: IOException) {
+        report("mockDeviceKit.copyAsset", throwable = e, attributes = mapOf("asset.path" to path))
         null
     }
 
     private fun generatedFeed(): Uri? = try {
         Uri.fromFile(MockVideoFeed.create(File(context.cacheDir, "mockdevicekit/generated_feed.mp4").apply { parentFile?.mkdirs() }))
     } catch (e: IOException) {
-        logger.warn(TAG, "Could not generate a mock camera feed", e)
+        report("mockDeviceKit.generateFeed", throwable = e)
         null
     } catch (e: IllegalStateException) {
-        logger.warn(TAG, "Could not generate a mock camera feed", e)
+        report("mockDeviceKit.generateFeed", throwable = e)
         null
     }
+
+    /** Debug-only: reaches Crashlytics only with `-Pbasira.firebase.debugCollection=true`. */
+    private fun report(
+        operation: String,
+        message: String? = null,
+        throwable: Throwable? = null,
+        attributes: Map<String, String> = emptyMap(),
+    ) = errorReporter.report(
+        ErrorReport(
+            domain = ErrorDomain.GLASSES,
+            operation = operation,
+            severity = ErrorSeverity.WARNING,
+            outcome = "simulation_degraded",
+            message = message,
+            throwable = throwable,
+            attributes = attributes,
+        ),
+    )
 
     private companion object {
         const val TAG = "MockDeviceKit"

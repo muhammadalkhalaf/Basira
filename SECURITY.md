@@ -44,7 +44,7 @@ The project owner explicitly accepted these risks for private testing.
 
 - Photos are sent **directly from the phone to Google's Gemini API** and processed under the
   [Gemini API terms](https://ai.google.dev/gemini-api/terms). No other server receives them
-  (Firebase never receives images or descriptions).
+  (Firebase never receives images; see below for what non-fatal reports may carry).
 - The app does not intentionally store photos: they are processed in memory, re-encoded as JPEG
   without EXIF (removes GPS location, timestamps, device data), sent, and discarded. No temporary file
   is written for the upload.
@@ -58,14 +58,24 @@ The project owner explicitly accepted these risks for private testing.
   (off in debug unless `-Pbasira.firebase.debugCollection=true`). They collect only the SDKs'
   automatic data: app-usage events such as `first_open`, `session_start`, and `screen_view`, the
   Firebase installation ID, app/OS/device model and coarse region, and crash stack traces. The app
-  sends no custom events, keys, or log messages: never pass images, prompts, recognized text,
-  descriptions, object names, or the API key to Firebase.
+  sends no custom Analytics events.
+- **Non-fatal reports.** Every failure the app catches is reported to Crashlytics through one
+  `ErrorReporter` (`app/.../controllers/reporting`), with custom keys for the domain, severity,
+  outcome, operation, build mode, Gemini model, language, and network state. **Nothing is
+  sanitised**: exception messages, Gemini error bodies (first 1 KB), request URLs, and DAT/TTS error
+  codes are sent as they are. In particular, an answer Gemini returns that breaks the JSON contract,
+  or an unreadable saved history entry, can put a fragment of a description into a report. Images and
+  the Gemini key are never part of a report (the key travels only in a request header, which is not
+  reported). Connection failures (offline, DNS, refused/dropped connections, cancellations) and
+  glasses-state conditions (disconnected, too hot, no permission) are not reported, only logged as
+  breadcrumbs; a repeated failure is sent at most once a minute.
 - Advertising ID and SSAID collection are disabled, the `AD_ID` and Privacy Sandbox (AdServices)
   permissions are removed, and ad storage/user-data/personalization consent defaults to denied.
 - `google-services.json` is untracked. Its API key identifies the Firebase project and is not a
   secret, but restrict it in Google Cloud Console (Android app restriction for `com.basira.app` and
   the release signing certificate) and keep it separate from the Gemini key.
-- Testers must be told that release builds send crash reports and usage statistics to Firebase.
+- Testers must be told that release builds send crash reports, non-fatal error reports, and usage
+  statistics to Firebase.
 
 ## Safety
 
