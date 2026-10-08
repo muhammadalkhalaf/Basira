@@ -38,6 +38,12 @@ interface GlassesSetupLauncher {
     val cameraPermissionContract: ActivityResultContract<Unit, Boolean>
 
     /**
+     * Whether [cameraPermissionContract] can be launched now. Initializes the SDK when possible;
+     * launching the contract before the SDK is ready crashes inside DAT.
+     */
+    fun canRequestCameraPermission(): Boolean
+
+    /**
      * Starts the Meta AI registration flow.
      *
      * @param activity foreground activity that receives the callback deep link.
@@ -94,13 +100,15 @@ class DatGlassesSetupLauncher @Inject constructor(
 
     override val cameraPermissionContract: ActivityResultContract<Unit, Boolean> = CameraPermissionContract()
 
+    override fun canRequestCameraPermission(): Boolean = isReady()
+
     override fun startRegistration(activity: Activity) {
-        if (sdk.initializeIfPermitted() != com.basira.domain.model.SdkState.READY) return
+        if (!isReady()) return
         Wearables.startRegistration(activity)
     }
 
     override fun openFirmwareUpdate(activity: Activity): Boolean =
-        Wearables.openFirmwareUpdate(activity).fold(
+        isReady() && Wearables.openFirmwareUpdate(activity).fold(
             { true },
             { error, _ ->
                 errorReporter.reportSetupError("dat.openFirmwareUpdate", error, error.description, "meta_ai_opened_instead")
@@ -109,7 +117,7 @@ class DatGlassesSetupLauncher @Inject constructor(
         )
 
     override fun openGlassesAppUpdate(activity: Activity): Boolean =
-        Wearables.openDATGlassesAppUpdate(activity).fold(
+        isReady() && Wearables.openDATGlassesAppUpdate(activity).fold(
             { true },
             { error, _ ->
                 errorReporter.reportSetupError("dat.openGlassesAppUpdate", error, error.description, "meta_ai_opened_instead")
@@ -128,6 +136,9 @@ class DatGlassesSetupLauncher @Inject constructor(
                 },
             )
     }
+
+    /** Every `Wearables` call except `initialize` throws until the SDK is initialized. */
+    private fun isReady(): Boolean = sdk.initializeIfPermitted() == com.basira.domain.model.SdkState.READY
 
     private class DatPendingRequest(
         private val request: RegistrationRequest,
@@ -174,6 +185,8 @@ class FakeGlassesSetupLauncher(private val repository: FakeGlassesRepository) : 
             override fun getSynchronousResult(context: Context, input: Unit): SynchronousResult<Boolean> =
                 SynchronousResult(true)
         }
+
+    override fun canRequestCameraPermission(): Boolean = true
 
     override fun startRegistration(activity: Activity) = repository.simulateRegistration(true)
 

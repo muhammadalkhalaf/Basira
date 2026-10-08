@@ -161,7 +161,11 @@ class MainActivity : ComponentActivity() {
                 datSdk.initializeIfPermitted()
             }
             SetupAction.CONNECT_META_AI -> setupLauncher.startRegistration(this)
-            SetupAction.ALLOW_CAMERA -> cameraPermissionLauncher.launch(Unit)
+            SetupAction.ALLOW_CAMERA -> when {
+                setupLauncher.canRequestCameraPermission() -> cameraPermissionLauncher.launch(Unit)
+                // DAT cannot start without Bluetooth; ask for it so the camera request can follow.
+                !datSdk.hasBluetoothPermission() -> runSetup(SetupAction.ALLOW_BLUETOOTH)
+            }
             SetupAction.UPDATE_FIRMWARE -> if (!setupLauncher.openFirmwareUpdate(this)) metaAi.launchIntent()?.let(::startSafely)
             SetupAction.UPDATE_GLASSES_APP -> if (!setupLauncher.openGlassesAppUpdate(this)) metaAi.launchIntent()?.let(::startSafely)
             SetupAction.INSTALL_VOICE ->
